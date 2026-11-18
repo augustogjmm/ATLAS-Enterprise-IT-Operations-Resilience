@@ -39,6 +39,34 @@ try{
  assert.equal((await page.locator('.executive-kpi strong').allInnerTexts())[0],'1');
  assert.ok(await page.getByText('De la brecha a la acción').isVisible());
  await page.screenshot({path:resolve(artifacts,'atlas-governance-desktop.png'),fullPage:true});
+ // KPI y OKR: catálogos calculados, altas operativas y relaciones entre registros.
+ await page.locator('button[data-view="performance"]').click();
+ assert.equal(await page.locator('.performance-kpi').count(),5);
+ assert.equal(await page.locator('.okr-card').count(),2);
+ assert.ok((await page.locator('.performance-kpi').first().innerText()).includes('Riesgos críticos sin plan'));
+ await page.getByRole('button',{name:'Nuevo KPI'}).click();
+ await page.locator('[name="metric"]').selectOption('capacity_alerts');
+ await page.locator('[name="name"]').fill('Capacidad bajo umbral');
+ await page.locator('[name="target"]').fill('0');
+ await page.locator('[name="owner"]').fill('Operaciones IT');
+ await page.locator('#dialog-submit').click();
+ assert.equal(await page.locator('.performance-kpi').count(),6);
+ await page.getByRole('button',{name:'Nuevo objetivo'}).click();
+ await page.locator('[name="title"]').fill('Reducir exposición de capacidad');
+ await page.locator('[name="owner"]').fill('Gerencia IT');
+ await page.locator('[name="startDate"]').fill('2026-11-18');
+ await page.locator('[name="dueDate"]').fill('2027-02-01');
+ await page.locator('#dialog-submit').click();
+ assert.equal(await page.locator('.okr-card').count(),3);
+ const ourOkr=page.locator('.okr-card').filter({hasText:'Reducir exposición de capacidad'});
+ await ourOkr.getByRole('button',{name:'Resultado clave'}).click();
+ await page.locator('[name="kpiId"]').selectOption({label:'Capacidad bajo umbral'});
+ await page.locator('[name="baseline"]').fill('1');
+ await page.locator('[name="target"]').fill('0');
+ await page.locator('#dialog-submit').click();
+ assert.ok((await page.locator('.okr-card').filter({hasText:'Reducir exposición de capacidad'}).innerText()).includes('Capacidad bajo umbral'));
+ await page.screenshot({path:resolve(artifacts,'atlas-kpi-okr-desktop.png'),fullPage:true});
+
 
  // Evaluación -> riesgo automático sin plan
  await page.locator('button[data-view="assessments"]').click();
@@ -100,6 +128,10 @@ try{
 
  // Persistencia y exportación
  await page.reload({waitUntil:'networkidle'});
+ await page.locator('button[data-view="performance"]').click();
+ assert.equal(await page.locator('.performance-kpi').count(),6);
+ assert.equal(await page.locator('.okr-card').count(),3);
+ await page.locator('button[data-view="risks"]').click();
  await page.locator('button[data-view="risks"]').click();
  assert.equal(await page.locator('tr').filter({hasText:'Capacidad sobre umbral: Capacidad de pruebas E2E'}).count(),1);
  const [download]=await Promise.all([page.waitForEvent('download'),page.getByRole('button',{name:'Exportar respaldo'}).click()]);
