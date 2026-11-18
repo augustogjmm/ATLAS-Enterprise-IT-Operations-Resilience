@@ -1,4 +1,4 @@
-name: ATLAS quality and reproducibility
+name: ATLAS · Calidad y reproducibilidad
 on:
   push:
     branches: [main, feature/**]
@@ -14,13 +14,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Syntax verification
+      - name: Verificación de sintaxis
         run: npm run check
-      - name: Deterministic model tests
+      - name: Pruebas del motor de simulación
         run: npm test
-      - name: Build static application
+      - name: Construcción del sitio estático
         run: npm run build
-      - name: Check generated assets
+      - name: Verificación de archivos generados
         run: |
           test -f dist/index.html
           test -f dist/app.js
