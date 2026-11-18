@@ -1,0 +1,29 @@
+name: ATLAS quality and reproducibility
+on:
+  push:
+    branches: [main, feature/**]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax verification
+        run: npm run check
+      - name: Deterministic model tests
+        run: npm test
+      - name: Build static application
+        run: npm run build
+      - name: Check generated assets
+        run: |
+          test -f dist/index.html
+          test -f dist/app.js
+          test -f dist/lib/data.js
+          test -f dist/lib/engine.js
+      # No credentials, package installs, external API calls or deployment side effects.
