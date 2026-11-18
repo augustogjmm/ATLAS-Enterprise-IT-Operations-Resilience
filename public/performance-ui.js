@@ -6,7 +6,7 @@ export function performanceView(state,today,{esc,mini,semaphore,empty,nfmt,fmtPc
   const values=kpis.map(k=>({k,r:kpiResult(state,k,today)}));
   const measured=objectives.map(o=>objectiveProgress(state,o,today)).filter(x=>x.progress!==null);
   const mean=measured.length?measured.reduce((sum,x)=>sum+x.progress,0)/measured.length:null;
-  const format=(value,unit)=>value===null?'S/D':unit==='cantidad'?nfmt(value):unit==='/5'?nfmt(value)+' / 5':fmtPct(value);
+  const format=(value,unit)=>value===null?'S/D':unit==='cantidad'?nfmt(value):unit==='/5'?nfmt(value)+' / 5':unit==='min'?nfmt(value)+' min':fmtPct(value);
   const badge=(level,reason)=>semaphore({level,label:{ok:'En meta',warning:'Atención',critical:'Desviado',unknown:'Sin evaluar'}[level],reason});
   const kpiMarkup=values.map(({k,r})=>`<article class="performance-kpi signal-border-${r.level}">
    <div class="performance-kpi-top"><span class="executive-overline">INDICADOR / ${esc(METRICS[k.metric].label)}</span>${badge(r.level,r.description)}</div>

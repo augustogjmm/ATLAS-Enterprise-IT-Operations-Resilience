@@ -1,0 +1,30 @@
+/* ATLAS · ITSM analytics. Reutiliza componentes enterprise y jerarquía ejecutiva. */
+.itsm-kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px;margin:0 0 17px}
+.itsm-kpi-grid .performance-kpi{min-height:206px;padding:18px}
+.itsm-kpi-grid .performance-actual{font-size:34px}
+.itsm-kpi-grid .performance-kpi p{margin:13px 0 0}
+.itsm-monthly{display:flex;flex-direction:column;gap:14px;padding-top:3px}
+.itsm-month{border-bottom:1px solid #e6eef0;padding:4px 0 12px}
+.itsm-month:last-child{border:0;padding-bottom:0}
+.itsm-month-head,.itsm-month-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.itsm-month-head{font-size:11px;color:#385466;line-height:1.4}
+.itsm-month-head span{font-weight:760;text-transform:capitalize}
+.itsm-month-head strong{font-variant-numeric:tabular-nums;font-weight:710;color:#426576;font-size:11px}
+.itsm-month-foot{font-size:10px;color:#8294a1;margin-top:6px;line-height:1.5}
+.itsm-track{height:12px;border-radius:6px;background:#edf3f5;overflow:hidden;margin-top:8px;border:1px solid #e2ecef}
+.itsm-bar{height:100%;display:block;background:linear-gradient(90deg,#3a9187,#7bc8b0);border-radius:5px;min-width:0}
+.itsm-bar.mttr{background:linear-gradient(90deg,#557f9c,#8eb3cd)}
+.itsm-import-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:8px 0 22px}
+.itsm-import-actions label{cursor:pointer}
+.itsm-schema{background:#f5faf8;border:1px solid #d7e7df;padding:17px 16px;border-radius:8px;display:flex;flex-direction:column;gap:9px}
+.itsm-schema strong{font-size:12px;color:#2c5260}
+.itsm-schema code{font-size:11px;color:#196b61;line-height:1.65;white-space:normal;overflow-wrap:anywhere;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.itsm-schema p{font-size:11px;color:#718996;line-height:1.7;margin:3px 0 0}
+.itsm-service-identifiers{font-size:10px;line-height:1.9;color:#718b96;border-top:1px solid #e3edf0;margin:14px 0 0;padding-top:10px;overflow-wrap:anywhere}
+.itsm-service-identifiers code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-weight:730;color:#16776a}
+.itsm-principles{display:flex;flex-direction:column;gap:12px}
+.itsm-principles p{margin:0;padding:12px 14px;background:#f8fafb;border-left:3px solid #a7c7c1;border-radius:4px;font-size:11px;color:#607986;line-height:1.7}
+.itsm-principles strong{color:#2a5260}
+@media(max-width:1510px){.itsm-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){.itsm-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.itsm-kpi-grid .performance-kpi{min-height:0;padding:13px}.itsm-kpi-grid .performance-actual{font-size:28px}.itsm-kpi-grid .performance-kpi .signal-chip{font-size:8px}.itsm-kpi-grid .performance-kpi p{font-size:9px}.itsm-import-actions{align-items:stretch}.itsm-import-actions>*{flex:1 1 180px}.itsm-month-head{font-size:10px}}
+@media(max-width:390px){.itsm-kpi-grid{grid-template-columns:1fr}.itsm-kpi-grid .performance-actual{font-size:34px}}

@@ -2,6 +2,7 @@
 // Todos los valores surgen de registros del workspace; no hay KPIs ficticios de pantalla.
 import {dashboard,availability} from './core.js';
 import {serviceSignal} from './insights.js';
+import {incidentMetrics} from './incidents.js';
 
 export const METRICS = Object.freeze({
  critical_unmanaged:{label:'Riesgos críticos sin plan',unit:'cantidad',direction:'lower',description:'Riesgos abiertos con exposición ≥15/25 y ninguna acción vinculada.'},
@@ -13,7 +14,10 @@ export const METRICS = Object.freeze({
  availability_mean:{label:'Disponibilidad media de servicios',unit:'%',direction:'higher',description:'Promedio simple, no ponderado, de disponibilidad calculada de servicios con registros.'},
  assessment_maturity:{label:'Madurez media de assessments',unit:'/5',direction:'higher',description:'Media aritmética de scores de madurez (1–5), sin ponderación por vertical.'},
  team_coverage:{label:'Cobertura media de equipos',unit:'%',direction:'higher',description:'Media no ponderada de cobertura operativa de equipos registrados.'},
- decisions_overdue:{label:'Decisiones de comité vencidas',unit:'cantidad',direction:'lower',description:'Compromisos pendientes con fecha objetivo anterior a hoy.'}
+ decisions_overdue:{label:'Decisiones de comité vencidas',unit:'cantidad',direction:'lower',description:'Compromisos pendientes con fecha objetivo anterior a hoy.'},
+ mttr_90d:{label:'MTTR de incidentes (90 días)',unit:'min',direction:'lower',description:'Media de minutos entre apertura y resolución de incidentes cerrados en los últimos 90 días.'},
+ critical_incidents_30d:{label:'Incidentes P1/P2 (30 días)',unit:'cantidad',direction:'lower',description:'Número de incidentes P1 y P2 abiertos en los últimos 30 días; incluye casos resueltos.'},
+ open_incidents:{label:'Incidentes abiertos',unit:'cantidad',direction:'lower',description:'Incidentes que todavía no tienen fecha/hora de resolución registrada.'}
 });
 export const KPI_OPTIONS=Object.entries(METRICS).map(([key,val])=>[key,val.label]);
 const idValid=id=>typeof id==='string'&&id.length>0&&id.length<=90;
@@ -33,7 +37,9 @@ export function seedDemoPerformance(state){
     {id:'kpi-dr',name:'Cobertura de DR para servicios críticos',metric:'dr_verified',target:100,owner:'Continuidad IT',verticalId:''},
     {id:'kpi-risk-coverage',name:'Tratamiento de riesgos activos',metric:'risk_coverage',target:100,owner:'Gobierno de Tecnología',verticalId:''},
     {id:'kpi-actions',name:'Compromisos vencidos',metric:'overdue_actions',target:0,owner:'PMO Tecnológica',verticalId:''},
-    {id:'kpi-sla',name:'Servicios con SLA cumplido',metric:'sla_compliance',target:100,owner:'Operaciones IT',verticalId:''}
+    {id:'kpi-sla',name:'Servicios con SLA cumplido',metric:'sla_compliance',target:100,owner:'Operaciones IT',verticalId:''},
+    {id:'kpi-mttr',name:'Tiempo medio de resolución',metric:'mttr_90d',target:60,owner:'Operaciones IT',verticalId:''},
+    {id:'kpi-p1p2',name:'Incidentes prioritarios P1/P2',metric:'critical_incidents_30d',target:1,owner:'Gestión de Incidentes',verticalId:''}
   ];
   state.objectives=[
     {id:'okr-resilience',title:'Elevar el control de servicios críticos',owner:'Dirección de Tecnología',verticalId:'',startDate:'2026-11-01',dueDate:'2026-12-31',status:'activo'},
@@ -50,6 +56,7 @@ export function seedDemoPerformance(state){
 export function metricValue(state,key,today){
   ensurePerformanceState(state);
   const base=dashboard(state,today);
+  const incidents=incidentMetrics(state,today);
   const measured=state.services.map(s=>({service:s,value:availability(s)})).filter(x=>x.value!==null);
   switch(key){
     case 'critical_unmanaged':return state.risks.length?base.criticalUnmanaged:null;
@@ -65,6 +72,9 @@ export function metricValue(state,key,today){
     case 'assessment_maturity':return base.averageAssessment;
     case 'team_coverage':return state.teamCapacities.length?state.teamCapacities.reduce((n,t)=>n+Number(t.coveragePct),0)/state.teamCapacities.length:null;
     case 'decisions_overdue':return state.decisions.length?state.decisions.filter(d=>d.status==='pendiente'&&d.dueDate<today).length:null;
+    case 'mttr_90d':return incidents.mttr90;
+    case 'critical_incidents_30d':return incidents.total?incidents.critical30:null;
+    case 'open_incidents':return incidents.total?incidents.open:null;
     default:throw new Error('Métrica no admitida.');
   }
 }

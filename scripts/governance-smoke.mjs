@@ -39,9 +39,31 @@ try{
  assert.equal((await page.locator('.executive-kpi strong').allInnerTexts())[0],'1');
  assert.ok(await page.getByText('De la brecha a la acción').isVisible());
  await page.screenshot({path:resolve(artifacts,'atlas-governance-desktop.png'),fullPage:true});
+ // Ingestión ITSM: importar dos incidentes, calcular recuperación, cerrar y persistir.
+ await page.locator('button[data-view="incidents"]').click();
+ assert.ok(await page.getByText('Incidentes, recuperación y tendencias.').isVisible());
+ assert.equal(await page.locator('.itsm-month').count(),12); // dos series de seis meses
+ assert.ok(await page.locator('tr').filter({hasText:'DEMO-112'}).count()>0);
+ const incidentCSV=[
+ 'incident_id,service_id,priority,opened_at,resolved_at,summary',
+ 'CSV-E2E-01,s-core,P2,2026-11-18T10:00:00-03:00,2026-11-18T10:42:00-03:00,"Ticket, resuelto"',
+ 'CSV-E2E-02,s-channel,P1,2026-11-18T12:30:00-03:00,,Incidente pendiente'
+ ].join(String.fromCharCode(10));
+ page.once('dialog',d=>d.accept());
+ await page.locator('#incident-file').setInputFiles({name:'importacion-itsm-smoke.csv',mimeType:'text/csv',buffer:Buffer.from(incidentCSV)});
+ await page.waitForFunction(()=>document.querySelector('#view-root')?.textContent?.includes('CSV-E2E-01'));
+ assert.equal(await page.locator('tr').filter({hasText:'CSV-E2E-01'}).count(),1);
+ assert.ok((await page.locator('tr').filter({hasText:'CSV-E2E-01'}).innerText()).includes('42 min'));
+ const openRow=page.locator('tr').filter({hasText:'CSV-E2E-02'});
+ await openRow.getByRole('button',{name:'Cerrar incidente'}).click();
+ await page.locator('[name="resolvedAt"]').fill('2026-11-18T13:30:00-03:00');
+ await page.locator('#dialog-submit').click();
+ assert.ok((await page.locator('tr').filter({hasText:'CSV-E2E-02'}).innerText()).includes('60 min'));
+ await page.screenshot({path:resolve(artifacts,'atlas-it-sm-incidentes.png'),fullPage:true});
+
  // KPI y OKR: catálogos calculados, altas operativas y relaciones entre registros.
  await page.locator('button[data-view="performance"]').click();
- assert.equal(await page.locator('.performance-kpi').count(),5);
+ assert.equal(await page.locator('.performance-kpi').count(),7);
  assert.equal(await page.locator('.okr-card').count(),2);
  assert.ok((await page.locator('.performance-kpi').first().innerText()).includes('Riesgos críticos sin plan'));
  await page.getByRole('button',{name:'Nuevo KPI'}).click();
@@ -50,7 +72,7 @@ try{
  await page.locator('[name="target"]').fill('0');
  await page.locator('[name="owner"]').fill('Operaciones IT');
  await page.locator('#dialog-submit').click();
- assert.equal(await page.locator('.performance-kpi').count(),6);
+ assert.equal(await page.locator('.performance-kpi').count(),8);
  await page.getByRole('button',{name:'Nuevo objetivo'}).click();
  await page.locator('[name="title"]').fill('Reducir exposición de capacidad');
  await page.locator('[name="owner"]').fill('Gerencia IT');
@@ -128,8 +150,12 @@ try{
 
  // Persistencia y exportación
  await page.reload({waitUntil:'networkidle'});
+ await page.locator('button[data-view="incidents"]').click();
+ assert.equal(await page.locator('tr').filter({hasText:'CSV-E2E-01'}).count(),1);
+ assert.equal(await page.locator('tr').filter({hasText:'CSV-E2E-02'}).count(),1);
+
  await page.locator('button[data-view="performance"]').click();
- assert.equal(await page.locator('.performance-kpi').count(),6);
+ assert.equal(await page.locator('.performance-kpi').count(),8);
  assert.equal(await page.locator('.okr-card').count(),3);
  await page.locator('button[data-view="risks"]').click();
  await page.locator('button[data-view="risks"]').click();
@@ -154,6 +180,9 @@ try{
  await mobile.goto(url,{waitUntil:'networkidle'});
  assert.equal((await mobile.locator('.executive-kpi strong').allInnerTexts())[0],'1');
  assert.equal(await mobile.locator('.heatmap-cell').count(),25);
+ await mobile.locator('button[data-view="incidents"]').click();
+ assert.ok(await mobile.locator('.itsm-kpi-grid').isVisible());
+ await mobile.screenshot({path:resolve(artifacts,'atlas-it-sm-movil.png'),fullPage:true});
  await mobile.locator('button[data-view="capacity"]').click();
  const overflow=await mobile.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);
  assert.ok(overflow<=1,'Desbordamiento horizontal en móvil: '+overflow);
