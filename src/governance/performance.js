@@ -53,25 +53,43 @@ export function seedDemoPerformance(state){
   ];
   return state;
 }
-export function metricValue(state,key,today){
+export function scopeWorkspace(state,verticalId=''){
+  if(!verticalId)return state;
+  if(!state.verticals.some(v=>v.id===verticalId))throw new Error('La vertical solicitada no existe.');
+  const risks=state.risks.filter(r=>r.verticalId===verticalId);
+  const riskIds=new Set(risks.map(r=>r.id));
+  const services=state.services.filter(s=>s.verticalId===verticalId);
+  const serviceIds=new Set(services.map(s=>s.id));
+  return {...state,
+    verticals:state.verticals.filter(v=>v.id===verticalId),services,
+    risks,actions:state.actions.filter(a=>riskIds.has(a.riskId)),
+    assessments:state.assessments.filter(a=>a.verticalId===verticalId),
+    capacities:state.capacities.filter(a=>a.verticalId===verticalId),
+    teamCapacities:state.teamCapacities.filter(a=>a.verticalId===verticalId),
+    decisions:state.decisions.filter(d=>d.riskId&&riskIds.has(d.riskId)),
+    incidents:(state.incidents||[]).filter(i=>serviceIds.has(i.serviceId))
+  };
+}
+export function metricValue(state,key,today,scope={}){
   ensurePerformanceState(state);
-  const base=dashboard(state,today);
-  const incidents=incidentMetrics(state,today);
-  const measured=state.services.map(s=>({service:s,value:availability(s)})).filter(x=>x.value!==null);
+  const scoped=scopeWorkspace(state,scope.verticalId||'');
+  const base=dashboard(scoped,today);
+  const incidents=incidentMetrics(scoped,today);
+  const measured=scoped.services.map(s=>({service:s,value:availability(s)})).filter(x=>x.value!==null);
   switch(key){
-    case 'critical_unmanaged':return state.risks.length?base.criticalUnmanaged:null;
-    case 'overdue_actions':return state.actions.length?base.overdue:null;
+    case 'critical_unmanaged':return scoped.risks.length?base.criticalUnmanaged:null;
+    case 'overdue_actions':return scoped.actions.length?base.overdue:null;
     case 'risk_coverage':return base.riskTreatmentPct;
-    case 'capacity_alerts':return state.capacities.length+state.teamCapacities.length?base.capacityAlerts+base.teamAlerts:null;
+    case 'capacity_alerts':return scoped.capacities.length+scoped.teamCapacities.length?base.capacityAlerts+base.teamAlerts:null;
     case 'dr_verified':{
-      const critical=state.services.filter(s=>Number(s.criticality)===1);
+      const critical=scoped.services.filter(s=>Number(s.criticality)===1);
       return critical.length?100*critical.filter(s=>serviceSignal(s,today).level==='ok').length/critical.length:null;
     }
     case 'sla_compliance':return measured.length?100*measured.filter(x=>x.value>=Number(x.service.targetPct)).length/measured.length:null;
     case 'availability_mean':return measured.length?measured.reduce((a,b)=>a+b.value,0)/measured.length:null;
     case 'assessment_maturity':return base.averageAssessment;
-    case 'team_coverage':return state.teamCapacities.length?state.teamCapacities.reduce((n,t)=>n+Number(t.coveragePct),0)/state.teamCapacities.length:null;
-    case 'decisions_overdue':return state.decisions.length?state.decisions.filter(d=>d.status==='pendiente'&&d.dueDate<today).length:null;
+    case 'team_coverage':return scoped.teamCapacities.length?scoped.teamCapacities.reduce((n,t)=>n+Number(t.coveragePct),0)/scoped.teamCapacities.length:null;
+    case 'decisions_overdue':return scoped.decisions.length?scoped.decisions.filter(d=>d.status==='pendiente'&&d.dueDate<today).length:null;
     case 'mttr_90d':return incidents.mttr90;
     case 'critical_incidents_30d':return incidents.total?incidents.critical30:null;
     case 'open_incidents':return incidents.total?incidents.open:null;
@@ -85,7 +103,7 @@ export function targetReached(value,target,direction){
 export function kpiResult(state,kpi,today){
   const spec=METRICS[kpi.metric];
   if(!spec)throw new Error('Indicador no reconocido.');
-  const value=metricValue(state,kpi.metric,today);
+  const value=metricValue(state,kpi.metric,today,{verticalId:kpi.verticalId||''});
   const reached=targetReached(value,kpi.target,spec.direction);
   let level='unknown';
   if(reached===true)level='ok';
@@ -102,7 +120,7 @@ export function keyResultProgress(state,result,today){
   if(parent?.status==='cerrado'&&parent.closureResults?.[result.id])return parent.closureResults[result.id];
   const kpi=state.kpis.find(k=>k.id===result.kpiId);
   if(!kpi)return {progress:null,level:'unknown',value:null,reason:'KPI vinculado inexistente.'};
-  const value=metricValue(state,kpi.metric,today);
+  const value=metricValue(state,kpi.metric,today,{verticalId:kpi.verticalId||''});
   if(value===null||!numValid(value))return {progress:null,level:'unknown',value:null,reason:'No hay registros para calcular el KPI.'};
   const {baseline,target}=result;
   if(!numValid(baseline)||!numValid(target))return {progress:null,level:'unknown',value,reason:'Línea base o meta inválida.'};

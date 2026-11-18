@@ -1,12 +1,19 @@
-import {incidentMetrics,incidentMonthly,incidentByService,resolutionMinutes} from './lib/governance/incidents.js';
+import {incidentMetrics,incidentMonthly,incidentByService,resolutionMinutes,selectIncidents} from './lib/governance/incidents.js';
 import {kpiResult} from './lib/governance/performance.js';
 
-export function incidentsView(state,today,{esc,mini,semaphore,empty,nfmt,fmtPct}){
- const stats=incidentMetrics(state,today),monthly=incidentMonthly(state,today),services=incidentByService(state);
+export function incidentsView(state,today,{esc,mini,semaphore,empty,nfmt,fmtPct},filters={}){
+ const stats=incidentMetrics(state,today,filters),monthly=incidentMonthly(state,today,6,filters),services=incidentByService(state,filters);
+ const filteredIncidents=selectIncidents(state,filters);
+ const matchingScope=k=>(k.verticalId||'')===(filters.verticalId||'')&&!filters.serviceId;
+ const filterOptions=(all,current)=>all.map(([value,label])=>'<option value="'+esc(value)+'"'+(value===current?' selected':'')+'>'+esc(label)+'</option>').join('');
+ const verticalOptions=[['','Todas las verticales'],...state.verticals.map(v=>[v.id,v.name])];
+ const serviceOptions=[['','Todos los servicios'],...state.services.filter(s=>!filters.verticalId||s.verticalId===filters.verticalId).map(x=>[x.id,x.name])];
+ const scopeName=filters.serviceId?state.services.find(x=>x.id===filters.serviceId)?.name:(filters.verticalId?state.verticals.find(v=>v.id===filters.verticalId)?.name:'Consolidado corporativo');
+ const filterBar='<section class="itsm-filter-bar"><div><span class="executive-overline">ALCANCE DEL ANÁLISIS</span><strong>'+esc(scopeName||'Consolidado')+'</strong><p>Los filtros afectan todas las mediciones y tendencias de esta vista; no modifican registros.</p></div><div class="itsm-filter-controls"><label>Vertical<select id="itsm-vertical-filter">'+filterOptions(verticalOptions,filters.verticalId||'')+'</select></label><label>Servicio<select id="itsm-service-filter">'+filterOptions(serviceOptions,filters.serviceId||'')+'</select></label></div></section>';
  const signal=(level,reason)=>semaphore({level,label:level==='critical'?'Crítico':level==='warning'?'Atención':level==='ok'?'En control':'Sin evaluar',reason});
  const fmtMinutes=value=>value===null?'S/D':nfmt(value)+' min';
- const set=state.incidents||[],has=!!set.length;
- const mttrKpi=state.kpis?.find(k=>k.metric==='mttr_90d'),criticalKpi=state.kpis?.find(k=>k.metric==='critical_incidents_30d');
+ const set=filteredIncidents,has=!!set.length;
+ const mttrKpi=state.kpis?.find(k=>k.metric==='mttr_90d'&&matchingScope(k)),criticalKpi=state.kpis?.find(k=>k.metric==='critical_incidents_30d'&&matchingScope(k));
  const mttrLevel=mttrKpi?kpiResult(state,mttrKpi,today).level:'unknown';
  const criticalLevel=criticalKpi?kpiResult(state,criticalKpi,today).level:'unknown';
  const evaluatedKpi=(kpi,level,description)=>kpi?signal(level,description):semaphore({level:'unknown',label:'Sin meta',reason:description});
@@ -43,6 +50,7 @@ export function incidentsView(state,today,{esc,mini,semaphore,empty,nfmt,fmtPct}
  <p class="executive-summary-text">Importá incidentes de un CSV, seguí los casos abiertos y medí tiempos de recuperación. El MTTR utiliza diferencias entre fechas reales de apertura y resolución, no números de ejemplo fijados en el tablero.</p>
  <div class="summary-footnotes"><span>Períodos móviles: 30 y 90 días</span><span>Los meses se agrupan por fecha de origen del registro</span><span>CSV local; no se envía a servidores</span></div></div>
  <div class="summary-aside"><div class="summary-aside-header">INCIDENTES ABIERTOS</div><div class="summary-aside-value">${stats.open}</div><span>${stats.criticalOpen} abiertos P1 / P2</span>${signal(riskLevel,'Semáforo basado en abiertos P1/P2 y pendientes')}</div></div></section>
+ ${filterBar}
  <div class="section-eyeline">01 / OPERACIÓN · KPIS CALCULADOS</div>
  <div class="itsm-kpi-grid">
   <article class="performance-kpi signal-border-${mttrLevel}"><div class="performance-kpi-top"><span class="executive-overline">MTTR · ÚLTIMOS 90 DÍAS</span>${evaluatedKpi(mttrKpi,mttrLevel,'MTTR comparado con la meta del KPI configurado; no equivale a downtime.')}</div><div class="performance-actual">${esc(fmtMinutes(stats.mttr90))}</div><p>Media desde apertura hasta resolución de ${stats.resolved90} incidente(s) cerrados en los últimos 90 días.</p></article>
@@ -70,6 +78,7 @@ export function incidentsView(state,today,{esc,mini,semaphore,empty,nfmt,fmtPct}
  <div class="layout-two">
   <section class="executive-panel"><div class="executive-panel-head"><div><span class="executive-overline">DATA INGESTION / CSV</span><h3>Importar incidentes</h3><p>Cargá registros exportados de una herramienta ITSM mediante una plantilla controlada.</p></div></div>
    <div class="itsm-import-actions"><label for="incident-file" class="button button-primary">Seleccionar CSV</label><input type="file" id="incident-file" accept=".csv,text/csv,text/plain" hidden><button type="button" class="button button-subtle" data-command="incident-sample">Descargar ejemplo CSV</button></div>
+   <div id="itsm-import-workspace" aria-live="polite"></div>
    <div class="itsm-schema"><strong>Columnas obligatorias</strong><code>incident_id, service_id, priority, opened_at, resolved_at, summary</code><p>Servicio por ID (ver tabla de servicios); prioridad P1–P4; fechas ISO 8601 con zona, por ejemplo <code>2026-11-18T10:30:00-03:00</code>. Dejá <code>resolved_at</code> vacío para casos abiertos.</p></div>
    <p class="mini-glossary">Importación transaccional: se rechaza el lote completo si una fila es inválida. Los IDs ya importados no se duplican; un incidente abierto puede actualizarse con una fecha de resolución. Máximo 2000 incidentes y archivo de 512 KB.</p>
    <p class="itsm-service-identifiers">IDs de servicios disponibles: ${state.services.map(s=>'<code>'+esc(s.id)+'</code> '+esc(s.name)).join(' · ')||'No hay servicios cargados.'}</p>

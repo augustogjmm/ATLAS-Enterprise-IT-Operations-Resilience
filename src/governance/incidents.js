@@ -158,9 +158,15 @@ function rangeLastDays(today,days){
   return {start:Date.parse(today+'T00:00:00.000Z')-(days-1)*ONE_DAY,end};
 }
 function within(date,range){const ts=Date.parse(date);return ts>=range.start&&ts<=range.end;}
-export function incidentMetrics(state,today){
+export function selectIncidents(state,filters={}){
   ensureIncidentState(state);
-  const set=state.incidents,last30=rangeLastDays(today,30),last90=rangeLastDays(today,90);
+  const {verticalId='',serviceId=''}=filters;
+  const allowed=new Set(state.services.filter(s=>(!verticalId||s.verticalId===verticalId)&&(!serviceId||s.id===serviceId)).map(s=>s.id));
+  return state.incidents.filter(it=>allowed.has(it.serviceId));
+}
+export function incidentMetrics(state,today,filters={}){
+  ensureIncidentState(state);
+  const set=selectIncidents(state,filters),last30=rangeLastDays(today,30),last90=rangeLastDays(today,90);
   const last30Opened=set.filter(it=>within(it.openedAt,last30));
   const last90Resolved=set.filter(it=>it.resolvedAt&&within(it.resolvedAt,last90));
   const open=set.filter(it=>it.resolvedAt===null);
@@ -172,7 +178,7 @@ export function incidentMetrics(state,today){
     mttrHistorical:mean(set.filter(x=>x.resolvedAt).map(resolutionMinutes))
   };
 }
-export function incidentMonthly(state,today,months=6){
+export function incidentMonthly(state,today,months=6,filters={}){
   ensureIncidentState(state);
   const endMonth=today.slice(0,7);
   const yy=Number(endMonth.slice(0,4)),mm=Number(endMonth.slice(5,7));
@@ -181,7 +187,7 @@ export function incidentMonthly(state,today,months=6){
     return {month:date.toISOString().slice(0,7),opened:0,critical:0,resolved:0,mttr:null,_times:[]};
   });
   const index=new Map(slots.map(slot=>[slot.month,slot]));
-  for(const it of state.incidents){
+  for(const it of selectIncidents(state,filters)){
     const opening=index.get(it.openedAt.slice(0,7));
     if(opening){opening.opened++;if(['P1','P2'].includes(it.priority))opening.critical++;}
     if(it.resolvedAt){
@@ -191,10 +197,11 @@ export function incidentMonthly(state,today,months=6){
   }
   return slots.map(({_times,...s})=>({...s,mttr:mean(_times)}));
 }
-export function incidentByService(state){
+export function incidentByService(state,filters={}){
   ensureIncidentState(state);
-  return state.services.map(service=>{
-    const records=state.incidents.filter(i=>i.serviceId===service.id);
+  const allowed=selectIncidents(state,filters);
+  return state.services.filter(s=>(!filters.verticalId||s.verticalId===filters.verticalId)&&(!filters.serviceId||s.id===filters.serviceId)).map(service=>{
+    const records=allowed.filter(i=>i.serviceId===service.id);
     const resolved=records.filter(i=>i.resolvedAt!==null);
     return {serviceId:service.id,name:service.name,verticalId:service.verticalId,
       total:records.length,open:records.length-resolved.length,

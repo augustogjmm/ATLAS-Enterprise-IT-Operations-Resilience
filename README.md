@@ -4,7 +4,7 @@
 
 **ATLAS** es un proyecto personal demostrativo para roles de Head of IT, Gerencia de Infraestructura, Operaciones Tecnológicas y Arquitectura Empresarial. El propósito es mostrar cómo se organiza el **gobierno de tecnología basado en registros, responsables, prioridades y evidencias**, no solamente indicadores visuales.
 
-> **Versión funcional V3:** plataforma estática, con operaciones reales sobre datos almacenados en **el navegador del usuario**. El contenido de inicio es 100% ficticio, identificado como demostración. No monitorea infraestructura ni conecta servicios productivos. No utiliza todavía D1 ni autenticación multiusuario.
+> **Versión funcional V4:** plataforma estática, con operaciones reales sobre datos almacenados en **el navegador del usuario**. El contenido de inicio es 100% ficticio, identificado como demostración. No monitorea infraestructura ni conecta servicios productivos. No utiliza todavía D1 ni autenticación multiusuario.
 
 ## ¿Qué podés hacer?
 
@@ -33,11 +33,13 @@
 
 La segunda automatización vincula **mediciones de capacity sobre el umbral** con riesgos. Los KPI y KR se recalculan cuando los registros cambian: un riesgo que recibe un plan modifica la cobertura, los riesgos sin plan y los OKR que dependan de esas métricas. La puntuación de exposición resulta de **probabilidad × impacto**, no de un modelo probabilístico.
 
-## ITSM: incidentes y métricas derivadas
+## ITSM: incidentes, importación flexible y métricas derivadas
 
 ATLAS importa incidentes desde CSV con identificador, servicio, prioridad P1–P4, apertura, resolución ISO 8601 con zona horaria y descripción. Se valida todo el lote antes de aplicar cambios y se reconocen IDs repetidos sin duplicar registros.
 
 El módulo calcula MTTR de 90 días, P1/P2 de 30 días, incidentes abiertos, estadísticas por servicio y tendencias mensuales. Se incorporan tres nuevos KPI vinculables a OKR: MTTR (min), P1/P2 y pendientes. **Total: 13 métricas calculables.**
+
+**Novedad V4:** importa CSV de distintas herramientas mediante asistente de columnas, servicios, prioridades y zonas horarias explícitas. Filtra incidentes por vertical y servicio y permite definir KPI con alcance de una vertical para alimentar OKR segmentados. No equivale a conectarse directamente con ServiceNow o Jira.
 
 Importante: MTTR de tickets no es indisponibilidad real. El CSV no modifica automáticamente los minutos de caída ni los indicadores SLA de servicios.
 
@@ -98,6 +100,7 @@ La siguiente evolución prevista es D1 + autenticación + control por roles, pre
 
 - [Modelo y criterios del primer circuito funcional](docs/GOBIERNO_FUNCIONAL_V1.md)\n- [Definiciones y metodología KPI/OKR](docs/KPI_OKR_METODOLOGIA.md)
 - [Importación ITSM, CSV y metodología MTTR](docs/INCIDENTES_MTTR_CSV.md)
+- [Asistente de mapeo CSV y KPI segmentados por vertical](docs/IMPORTACION_FLEXIBLE_Y_KPI_VERTICAL_V4.md)
 - [Simulador de resiliencia y su arquitectura](docs/ARCHITECTURE.md)
 - [Guía de Cloudflare](docs/DESPLIEGUE_CLOUDFLARE.md)
 - [Seguridad](SECURITY.md)
