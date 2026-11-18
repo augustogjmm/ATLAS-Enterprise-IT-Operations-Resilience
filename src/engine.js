@@ -74,10 +74,10 @@ export function evaluateScenario(scenarioId = 'baseline', interventionId = 'none
       modeledOpex: BUDGET.opex + intervention.opex
     },
     assumptions: [
-      'Synthetic routes and recovery estimates; not measured uptime or validated DR results.',
-      'An alternate dependency path is a model assumption, not proof of tested failover.',
-      'RTO and RPO are objectives; restoration times and potential data loss are estimated inputs.',
-      'Investments model only stated recovery-time reductions, never guaranteed outcomes.'
+      'Rutas y tiempos de recuperación ficticios; no son mediciones de disponibilidad ni resultados de DR validados.',
+      'Una ruta alternativa es un supuesto del modelo, no evidencia de una contingencia probada.',
+      'RTO y RPO son objetivos; los tiempos de recuperación y la pérdida potencial de datos son estimaciones.',
+      'Las inversiones solo modifican los tiempos estimados declarados; no garantizan resultados reales.'
     ]
   };
 }
