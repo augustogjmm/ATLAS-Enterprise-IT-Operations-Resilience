@@ -58,12 +58,6 @@ try{
   const localData=await editor.page.evaluate(()=>localStorage.getItem('atlas-governance-workspace-v1'));
   assert.ok(localData);
   await editor.page.locator('[data-workspace-command="connect"]').click();
-  await editor.page.waitForTimeout(350);
-  console.log('V5 diagnostic:',JSON.stringify({
-    requests:editor.requests,
-    panel:await editor.page.locator('#workspace-panel').innerText(),
-    errors
-  }));
   await editor.page.locator('[data-workspace-command="open"]').waitFor({timeout:4000});
   await editor.page.locator('[data-workspace-command="open"]').click();
   await editor.page.getByText('Compartido: Gobierno Compartido').waitFor();
