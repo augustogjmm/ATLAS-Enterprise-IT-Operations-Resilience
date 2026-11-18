@@ -5,11 +5,11 @@ const $ = id => document.getElementById(id);
 const scenarioSelect = $('scenario-select');
 const interventionSelect = $('intervention-select');
 const labelForState = {
-  HEALTHY: 'Operational',
-  EXPOSED: 'Redundancy reduced',
-  SINGLE_PATH: 'Single recovery path',
-  FAILOVER: 'Failover required',
-  OUTAGE: 'Service unavailable'
+  HEALTHY: 'Operativo',
+  EXPOSED: 'Redundancia reducida',
+  SINGLE_PATH: 'Ruta única de recuperación',
+  FAILOVER: 'Contingencia en curso',
+  OUTAGE: 'Servicio indisponible'
 };
 const money = value => new Intl.NumberFormat('en-US', {
   style: 'currency', currency: 'USD', maximumFractionDigits: 0
@@ -32,13 +32,13 @@ scenarioSelect.value = 'dc-north';
 interventionSelect.value = 'none';
 
 function drawTopology(outcome) {
-  const sites = ['DC North', 'DC South', 'Cloud region'];
+  const sites = ['DC Norte', 'DC Sur', 'Región cloud'];
   const failed = new Set(outcome.scenario.failed);
   const markup = sites.map(site => {
     const nodes = COMPONENTS.filter(node => node.site === site);
     const affected = nodes.filter(node => failed.has(node.id)).length;
     return `<div class="site" aria-label="${site}">
-      <div class="site-title">${site}<span>${affected ? affected + ' FAILED' : 'NOMINAL'}</span></div>
+      <div class="site-title">${site}<span>${affected ? affected + ' EN FALLA' : 'NORMAL'}</span></div>
       ${nodes.map(node => `<div class="node ${failed.has(node.id) ? 'failed' : ''}">
         <span class="node-status" aria-hidden="true"></span>
         <span>${node.name}</span></div>`).join('')}
@@ -70,15 +70,15 @@ function drawManagement(outcome) {
   const comparison = compareIntervention(scenario.id, intervention.id);
   $('posture-critical').textContent = summary.tierOneAffected
     ? `${summary.tierOneAffected} / 3 critical services impacted`
-    : 'No Tier 1 service interruption';
+    : 'Sin interrupciones de criticidad 1';
   $('posture-redundancy').textContent = `${summary.reducedRedundancy} service(s) have a failed alternate route`;
   $('posture-decision').textContent = summary.breaches
-    ? 'Prioritize breached recovery objectives'
+    ? 'Priorizar los objetivos de recuperación incumplidos'
     : summary.reducedRedundancy
-      ? 'Restore alternate capacity'
+      ? 'Restablecer la capacidad de contingencia'
       : summary.affected
-        ? 'Validate failover and operational evidence'
-        : 'Maintain resilience tests and controls';
+        ? 'Validar la contingencia y sus evidencias'
+        : 'Mantener las pruebas y los controles de continuidad';
 
   $('investment-name').textContent = intervention.title;
   $('investment-rationale').textContent = intervention.rationale;
@@ -89,7 +89,7 @@ function drawManagement(outcome) {
   $('opex-bar').style.width = `${Math.min(100, summary.modeledOpex / (BUDGET.opex + 100000) * 100)}%`;
   $('capex-bar').style.width = `${Math.min(100, summary.modeledCapex / (BUDGET.capex + 250000) * 100)}%`;
   $('budget-change').textContent = intervention.id === 'none'
-    ? 'Current modeled envelope · no incremental spend'
+    ? 'Presupuesto simulado sin gasto adicional'
     : `Intervention delta: ${money(comparison.capexDelta)} one-time CAPEX + ${money(comparison.opexDelta)} annual OPEX`;
 }
 
@@ -105,8 +105,8 @@ function render() {
   $('metric-breaches').textContent = summary.breaches;
   $('metric-risk').textContent = summary.riskIndex;
   $('risk-fill').style.width = `${summary.riskIndex}%`;
-  $('impact-tag').textContent = summary.affected ? 'ACTION REQUIRED' : 'NO OUTAGES';
-  $('breach-tag').textContent = summary.breaches ? 'REVIEW PRIORITY' : 'WITHIN TARGET';
+  $('impact-tag').textContent = summary.affected ? 'REQUIERE ACCIÓN' : 'SIN INTERRUPCIONES';
+  $('breach-tag').textContent = summary.breaches ? 'REVISAR PRIORIDAD' : 'OBJETIVOS CUMPLIDOS';
   $('scenario-label').textContent = scenario.label;
   $('scenario-category').textContent = scenario.category.toUpperCase();
   $('scenario-description').textContent = scenario.description;
@@ -121,10 +121,10 @@ function render() {
 function exportAssessment() {
   const outcome = evaluateScenario(scenarioSelect.value, interventionSelect.value);
   const evidence = {
-    product: 'ATLAS Executive Technology Command Center',
+    product: 'ATLAS · Centro Ejecutivo de Operaciones de TI',
     modelVersion: '0.1.0',
     exportedAt: new Date().toISOString(),
-    classification: 'SYNTHETIC DEMONSTRATION — NOT LIVE TELEMETRY',
+    classification: 'DEMOSTRACIÓN FICTICIA — NO SON DATOS OPERATIVOS REALES',
     scenario: outcome.scenario,
     intervention: outcome.intervention,
     summary: outcome.summary,
