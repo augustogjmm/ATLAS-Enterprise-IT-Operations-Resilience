@@ -11,7 +11,7 @@ const labelForState = {
   FAILOVER: 'Contingencia en curso',
   OUTAGE: 'Servicio indisponible'
 };
-const money = value => new Intl.NumberFormat('en-US', {
+const money = value => new Intl.NumberFormat('es-AR', {
   style: 'currency', currency: 'USD', maximumFractionDigits: 0
 }).format(value);
 const validSlugs = /^[a-z0-9-]+$/;
@@ -51,13 +51,13 @@ function drawServices(outcome) {
   $('service-rows').innerHTML = outcome.services.map(service => {
     const recovery = service.impacted
       ? `${service.restorationMinutes} min / ${service.rto} min`
-      : `Not triggered / ${service.rto} min`;
+      : `Sin interrupción / ${service.rto} min`;
     const loss = service.impacted
       ? `${service.assumedLoss} min / ${service.rpo} min`
-      : `Not triggered / ${service.rpo} min`;
+      : `Sin interrupción / ${service.rpo} min`;
     return `<tr>
       <td><div class="service-name">${service.name}</div><div class="service-owner">${service.owner}</div></td>
-      <td><span class="tier ${service.tier === 1 ? 'critical' : ''}">TIER ${service.tier}</span></td>
+      <td><span class="tier ${service.tier === 1 ? 'critical' : ''}">CRIT. ${service.tier}</span></td>
       <td><span class="state-pill ${service.state}">${labelForState[service.state]}</span></td>
       <td><span class="recovery-value ${service.rtoBreach ? 'breached' : ''}">${recovery}</span></td>
       <td><span class="recovery-value ${service.rpoBreach ? 'breached' : ''}">${loss}</span></td>
@@ -69,9 +69,9 @@ function drawManagement(outcome) {
   const { summary, intervention, scenario } = outcome;
   const comparison = compareIntervention(scenario.id, intervention.id);
   $('posture-critical').textContent = summary.tierOneAffected
-    ? `${summary.tierOneAffected} / 3 critical services impacted`
+    ? `${summary.tierOneAffected} / 3 servicios críticos afectados`
     : 'Sin interrupciones de criticidad 1';
-  $('posture-redundancy').textContent = `${summary.reducedRedundancy} service(s) have a failed alternate route`;
+  $('posture-redundancy').textContent = `${summary.reducedRedundancy} servicios sin ruta alternativa disponible`;
   $('posture-decision').textContent = summary.breaches
     ? 'Priorizar los objetivos de recuperación incumplidos'
     : summary.reducedRedundancy
@@ -90,7 +90,7 @@ function drawManagement(outcome) {
   $('capex-bar').style.width = `${Math.min(100, summary.modeledCapex / (BUDGET.capex + 250000) * 100)}%`;
   $('budget-change').textContent = intervention.id === 'none'
     ? 'Presupuesto simulado sin gasto adicional'
-    : `Intervention delta: ${money(comparison.capexDelta)} one-time CAPEX + ${money(comparison.opexDelta)} annual OPEX`;
+    : `Costo adicional estimado: ${money(comparison.capexDelta)} de CAPEX único + ${money(comparison.opexDelta)} de OPEX anual`;
 }
 
 function render() {
@@ -111,7 +111,7 @@ function render() {
   $('scenario-category').textContent = scenario.category.toUpperCase();
   $('scenario-description').textContent = scenario.description;
   $('live-region').textContent =
-    `${scenario.label}: ${summary.affected} impacted services, ${summary.breaches} recovery breaches.`;
+    `${scenario.label}: ${summary.affected} servicios afectados, ${summary.breaches} objetivos de recuperación incumplidos.`;
 
   drawTopology(outcome);
   drawServices(outcome);
