@@ -27,6 +27,13 @@ Los registros precargados, incidentes, responsables, costos y escenarios son fic
 
 La futura incorporación de Cloudflare D1 deberá ir precedida de autenticación, aislamiento de organizaciones, permisos por rol, control de acceso a APIs, políticas de retención y pruebas de seguridad.
 
+
+## V5 en desarrollo: postura de seguridad y controles pendientes
+
+La rama `feature/atlas-v5-multiusuario-gobierno` añade validación criptográfica de JWT de Cloudflare Access en el Worker, segregación por `tenant_id`, RBAC verificado por servidor, control de revisión y auditoría de operaciones de workspace/membresía. La UI remota es opt-in, y V4 conserva su modo local sin solicitar sesiones por defecto. No se han habilitado aún Cloudflare Access, la base D1 ni el Worker V5.
+
+**Esta implementación todavía no está aprobada para información real.** Las pruebas de seguridad y de usuario utilizan datos sintéticos y un backend simulado; deben completarse pruebas integradas de identidad y D1, procedimientos de backup/restauración, retención y eliminación, monitoreo de consumo y revisión de autorización antes de ponerla en producción. La auditoría de D1 no es un repositorio WORM ni prueba por sí sola cumplimiento regulatorio. No se registran tokens ni datos de workspaces en los eventos de auditoría.
+
 ## Reportes
 
 No incluir contraseñas, tokens, identificadores internos, diagramas privados ni información sensible en issues públicos. Para comunicar una vulnerabilidad que pueda revelar datos, contactar al propietario mediante su perfil profesional antes de publicar detalles. No se declara auditoría externa ni un acuerdo de niveles de respuesta.
