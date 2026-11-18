@@ -49,8 +49,12 @@ try{
  'CSV-E2E-01,s-core,P2,2026-11-18T10:00:00-03:00,2026-11-18T10:42:00-03:00,"Ticket, resuelto"',
  'CSV-E2E-02,s-channel,P1,2026-11-18T12:30:00-03:00,,Incidente pendiente'
  ].join(String.fromCharCode(10));
- page.once('dialog',d=>d.accept());
  await page.locator('#incident-file').setInputFiles({name:'importacion-itsm-smoke.csv',mimeType:'text/csv',buffer:Buffer.from(incidentCSV)});
+ assert.ok(await page.locator('#incident-mapping-form').isVisible());
+ assert.equal(await page.locator('[name="col_incident_id"]').inputValue(),'0');
+ assert.equal(await page.locator('[name="service_0"]').inputValue(),'s-core');
+ page.once('dialog',d=>d.accept());
+ await page.getByRole('button',{name:'Validar e importar CSV'}).click();
  await page.waitForFunction(()=>document.querySelector('#view-root')?.textContent?.includes('CSV-E2E-01'));
  assert.equal(await page.locator('tr').filter({hasText:'CSV-E2E-01'}).count(),1);
  assert.ok((await page.locator('tr').filter({hasText:'CSV-E2E-01'}).innerText()).includes('42 min'));
@@ -59,7 +63,32 @@ try{
  await page.locator('[name="resolvedAt"]').fill('2026-11-18T13:30:00-03:00');
  await page.locator('#dialog-submit').click();
  assert.ok((await page.locator('tr').filter({hasText:'CSV-E2E-02'}).innerText()).includes('60 min'));
- await page.screenshot({path:resolve(artifacts,'atlas-it-sm-incidentes.png'),fullPage:true});
+ await page.screenshot({path:resolve(artifacts,'atlas-it-sm-incidentes.png'),fullPage:true}); 
+ // Filtrado real por vertical: ninguna tarjeta o listado ajeno al alcance.
+ await page.locator('#itsm-vertical-filter').selectOption('v-net');
+ assert.equal(await page.locator('tr').filter({hasText:'CSV-E2E-01'}).count(),0);
+ assert.equal(await page.locator('tr').filter({hasText:'CSV-E2E-02'}).count(),0);
+ assert.equal(await page.locator('#itsm-service-filter option').count(),2);
+ await page.locator('#itsm-vertical-filter').selectOption('');
+
+ // Importación de un CSV con columnas de terceros, nombres de servicio y hora DMY sin zona.
+ const external=[
+  'Número de incidente;Servicio;Severidad;Fecha de apertura;Fecha de cierre;Descripción',
+  'EXT-SMOKE-01;Core transaccional;Alta;18/11/2026 08:00;18/11/2026 08:40;Incidente de mapeo'
+ ].join(String.fromCharCode(10));
+ await page.locator('#incident-file').setInputFiles({name:'formato-externo.csv',mimeType:'text/csv',buffer:Buffer.from(external)});
+ assert.ok(await page.locator('#incident-mapping-form').isVisible());
+ assert.equal(await page.locator('[name="col_summary"]').inputValue(),'5');
+ assert.equal(await page.locator('[name="service_0"]').inputValue(),'s-core');
+ await page.locator('[name="priority_0"]').selectOption('P1');
+ await page.locator('[name="date_format"]').selectOption('dmy');
+ await page.locator('[name="timezone_offset"]').fill('-03:00');
+ page.once('dialog',d=>d.accept());
+ await page.getByRole('button',{name:'Validar e importar CSV'}).click();
+ await page.waitForFunction(()=>document.querySelector('#view-root')?.textContent?.includes('EXT-SMOKE-01'));
+ assert.ok((await page.locator('tr').filter({hasText:'EXT-SMOKE-01'}).innerText()).includes('40 min'));
+ await page.screenshot({path:resolve(artifacts,'atlas-it-sm-mapping.png'),fullPage:true});
+
 
  // KPI y OKR: catálogos calculados, altas operativas y relaciones entre registros.
  await page.locator('button[data-view="performance"]').click();
