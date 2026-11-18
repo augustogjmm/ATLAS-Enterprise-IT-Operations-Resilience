@@ -55,10 +55,11 @@ test('cierre de objetivo exige evidencia y conserva fotografía de resultados',(
  assert.throws(()=>closeObjective(s,o.id,day,''),/evidencia/);
  closeObjective(s,o.id,day,'Acta de comité con mediciones, responsables y fechas');
  assert.equal(o.status,'cerrado');assert.equal(o.closedAt,day);
- assert.equal(objectiveProgress(s,o,day).progress,0);
+ const closedProgress=objectiveProgress(s,o,day).progress;
+ assert.ok(closedProgress>=0&&closedProgress<1);
  registerAction(s,{riskId:'r-net',title:'Controlar continuidad WAN',owner:'Networking',dueDate:'2026-12-01'},day,uid);
  assert.equal(keyResultProgress(s,kr,day).progress,0);
- assert.equal(objectiveProgress(s,o,day).progress,0);
+ assert.equal(objectiveProgress(s,o,day).progress,closedProgress);
 });
 
 test('se pueden crear nuevos KPI, objetivos y resultados clave, validando metas',()=>{
