@@ -4,6 +4,8 @@ import {
   registerCapacity, teamStatus, registerTeamCapacity, registerAction, completeAction, validateRisk, addEvent
 } from './lib/governance/core.js';
 import {worstSignal, riskSignal, actionSignal, infrastructureSignal, workforceSignal, assessmentSignal, serviceSignal, verticalSignal, executiveSummary, riskMatrix} from './lib/governance/insights.js';
+import {METRICS,KPI_OPTIONS,ensurePerformanceState,seedDemoPerformance,validatePerformanceState,addKpi,addObjective,addKeyResult,closeObjective} from './lib/governance/performance.js';
+import {performanceView as renderPerformanceView} from './performance-ui.js';
 
 const STORAGE_KEY='atlas-governance-workspace-v1';
 const today=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')};
@@ -26,6 +28,7 @@ const getRisk=id=>state.risks.find(r=>r.id===id);
 const getService=id=>state.services.find(s=>s.id===id);
 const idFactory=prefix=>prefix+'-'+crypto.randomUUID();
 const viewMeta={
+ performance:['KPI y OKR tecnológicos','Indicadores, objetivos, líneas base y resultados clave calculados'],
  overview:['Visión ejecutiva','Alertas accionables y seguimiento de prioridades'],
  verticals:['Verticales y equipos','Gobierno por dominio y responsables'],
  capacity:['Capacity management','Utilización, umbrales y proyección de tres meses'],
@@ -40,18 +43,27 @@ let modal=null;
 let toastTimeout=null;
 let storageOK=true;
 
+function upgrade(data){
+ assertValidState(data);
+ const missing=!Array.isArray(data.kpis)&&!Array.isArray(data.objectives)&&!Array.isArray(data.keyResults);
+ ensurePerformanceState(data);
+ if(missing&&data.kind==='demo')seedDemoPerformance(data);
+ validatePerformanceState(data);
+ return data;
+}
 function load(){
-  try{
-    const raw=localStorage.getItem(STORAGE_KEY);
-    if(raw)return assertValidState(JSON.parse(raw));
-    const data=createDemo();
-    localStorage.setItem(STORAGE_KEY,JSON.stringify(data));return data;
-  }catch(err){storageOK=false;return createDemo();}
+ try {
+  const raw=localStorage.getItem(STORAGE_KEY);
+  const data=raw?upgrade(JSON.parse(raw)):seedDemoPerformance(createDemo());
+  if(!raw||!JSON.parse(raw).kpis)localStorage.setItem(STORAGE_KEY,JSON.stringify(data));
+  return data;
+ } catch(err){storageOK=false;return seedDemoPerformance(createDemo());}
 }
 let state=load();
 function save(message){
   state.kind=state.kind==='demo'?'custom':state.kind;
   assertValidState(state);
+  validatePerformanceState(state);
   try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));storageOK=true;}
   catch(err){storageOK=false;notice('No se pudo guardar. Exportá un respaldo; el navegador bloqueó el almacenamiento.',true)}
   render();
@@ -310,7 +322,7 @@ function render(){
  $('view-title').textContent=meta[0];$('view-subtitle').textContent=meta[1];
  $('breadcrumb-current').textContent=meta[0].toUpperCase();
  $('environment-label').textContent=state.kind==='demo'?'DATOS FICTICIOS DE DEMOSTRACIÓN':state.kind==='local'?'ESPACIO LOCAL SIN DATOS DE DEMOSTRACIÓN':'DATOS LOCALES EDITADOS · PUEDE CONTENER EJEMPLOS FICTICIOS';
- const pages={overview,verticals:verticalsView,capacity:capacityView,assessments:assessmentsView,risks:risksView,actions:actionsView,continuity:continuityView,committee:committeeView};
+ const pages={overview,performance:()=>renderPerformanceView(state,today(),{esc,mini,semaphore,empty,nfmt,fmtPct}),verticals:verticalsView,capacity:capacityView,assessments:assessmentsView,risks:risksView,actions:actionsView,continuity:continuityView,committee:committeeView};
  $('view-root').innerHTML=(pages[view]||overview)();
  for(const node of document.querySelectorAll('[data-view]'))node.classList.toggle('selected',node.dataset.view===view);
 }
@@ -397,10 +409,10 @@ document.addEventListener('click',e=>{
   setTimeout(()=>URL.revokeObjectURL(objectUrl),1500);notice('Respaldo JSON descargado.');
  }
  if(cmd.dataset.command==='demo'&&confirm('¿Reemplazar los datos locales actuales por la demostración ficticia? Exportá un respaldo si querés conservarlos.')){
-  state=createDemo();save('Demostración restaurada.');state.kind='demo';localStorage.setItem(STORAGE_KEY,JSON.stringify(state));render();
+  state=seedDemoPerformance(createDemo());save('Demostración restaurada.');state.kind='demo';localStorage.setItem(STORAGE_KEY,JSON.stringify(state));render();
  }
  if(cmd.dataset.command==='empty'&&confirm('¿Vaciar todos los registros locales? Esta acción no se puede deshacer sin un respaldo exportado.')){
-  state=makeEmpty();save('Espacio local vacío preparado.');switchView('verticals');
+  state=ensurePerformanceState(makeEmpty());save('Espacio local vacío preparado.');switchView('verticals');
  }
 });
 $('record-form').addEventListener('submit',e=>{
@@ -415,14 +427,14 @@ $('import-file').addEventListener('change',async e=>{
  const file=e.target.files?.[0];e.target.value='';if(!file)return;
  if(file.size>1024*1024)return notice('El archivo supera 1 MB.',true);
  try{
-  const data=JSON.parse(await file.text());assertValidState(data);
+  const data=upgrade(JSON.parse(await file.text()));
   if(!confirm('¿Reemplazar todos los registros locales por este respaldo?'))return;
   state=data;state.kind='custom';save('Respaldo importado.');switchView('overview');
  }catch(err){notice('No se importó: '+(err.message||'JSON inválido'),true)}
 });
 window.addEventListener('storage',e=>{
  if(e.key!==STORAGE_KEY)return;
- try{state=e.newValue?assertValidState(JSON.parse(e.newValue)):createDemo();render();notice('Los registros fueron actualizados desde otra pestaña.')}catch{notice('No se pudo sincronizar esta pestaña.',true)}
+ try{state=e.newValue?upgrade(JSON.parse(e.newValue)):seedDemoPerformance(createDemo());render();notice('Los registros fueron actualizados desde otra pestaña.')}catch{notice('No se pudo sincronizar esta pestaña.',true)}
 });
 render();
 if(!storageOK)notice('El almacenamiento local no está disponible: los cambios no persistirán.',true);
