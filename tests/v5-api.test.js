@@ -8,6 +8,7 @@ import {makeEmpty} from '../src/governance/core.js';
 function fixture() {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec(readFileSync(new URL('../migrations/0001_atlas_v5.sql', import.meta.url), 'utf8'));
+  sqlite.exec(readFileSync(new URL('../migrations/0002_atlas_v5_history.sql', import.meta.url), 'utf8'));
   const stamp='2026-11-18T00:00:00.000Z';
   for (const [id,name] of [['org-a','Organización A'],['org-b','Organización B']])
     sqlite.prepare('INSERT INTO atlas_tenants(id,name,created_at) VALUES(?,?,?)').run(id,name,stamp);
@@ -130,4 +131,74 @@ test('validación y fail-closed: JSON, respaldo, origen y binding',async()=>{
     new Request('https://atlas.example/api/v1/session'),{});
   assert.equal(unconfigured.status,503);
   env.ATLAS_DB=null;
+});
+
+test('historial: retiene las últimas cinco revisiones sin perder auditoría',async()=>{
+  const {call,sqlite}=fixture();
+  const base='/api/v1/tenants/org-a/workspaces';
+  const created=await call('owner@a.test','POST',base,{name:'Con historial',state:makeEmpty()});
+  assert.equal(created.status,201);
+  const id=created.body.id,endpoint=base+'/'+id;
+  assert.equal((await call('viewer@a.test','GET',endpoint+'/revisions')).status,403);
+  const initial=await call('auditor@a.test','GET',endpoint+'/revisions');
+  assert.deepEqual(initial.body.revisions.map(x=>x.revision),[1]);
+  for(let revision=1;revision<=6;revision++){
+    const state=makeEmpty();
+    for(let n=0;n<revision;n++){
+      state.verticals.push({id:'vert-'+n,name:'Vertical '+n,owner:'Infraestructura',description:''});
+    }
+    const saved=await call('editor@a.test','PUT',endpoint,{revision,state});
+    assert.equal(saved.status,200);
+    assert.equal(saved.body.revision,revision+1);
+  }
+  const history=await call('auditor@a.test','GET',endpoint+'/revisions');
+  assert.deepEqual(history.body.revisions.map(x=>x.revision),[7,6,5,4,3]);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS count FROM atlas_workspace_revisions WHERE workspace_id=?').get(id).count,5);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS count FROM atlas_audit_events WHERE workspace_id=?').get(id).count,7);
+  assert.equal(Object.hasOwn(history.body.revisions[0],'state_json'),false,
+    'El listado no expone snapshots completos');
+});
+
+test('restauración: solo owner/admin, nueva revisión y trazabilidad',async()=>{
+  const {call,sqlite}=fixture();
+  const base='/api/v1/tenants/org-a/workspaces';
+  const made=await call('owner@a.test','POST',base,{name:'Recuperación',state:makeEmpty()});
+  const endpoint=base+'/'+made.body.id;
+  const s=makeEmpty();
+  s.verticals.push({id:'infra',name:'Infraestructura',owner:'Gerencia',description:'Laboratorio'});
+  assert.equal((await call('editor@a.test','PUT',endpoint,{revision:1,state:s})).status,200);
+  assert.equal((await call('viewer@a.test','PUT',endpoint+'/revisions/1/restore',{revision:2})).status,403);
+  assert.equal((await call('editor@a.test','PUT',endpoint+'/revisions/1/restore',{revision:2})).status,403);
+  const restored=await call('admin@a.test','PUT',endpoint+'/revisions/1/restore',{revision:2});
+  assert.equal(restored.status,200);
+  assert.deepEqual({revision:restored.body.revision,from:restored.body.restoredFrom},{revision:3,from:1});
+  const current=await call('viewer@a.test','GET',endpoint);
+  assert.equal(current.body.revision,3);
+  assert.deepEqual(current.body.state.verticals,[]);
+  const stale=await call('owner@a.test','PUT',endpoint+'/revisions/1/restore',{revision:2});
+  assert.equal(stale.status,409);
+  const missing=await call('owner@a.test','PUT',endpoint+'/revisions/999/restore',{revision:3});
+  assert.equal(missing.status,404);
+  const audit=await call('auditor@a.test','GET','/api/v1/tenants/org-a/audit');
+  const restorations=audit.body.events.filter(e=>e.action==='workspace.restored');
+  assert.equal(restorations.length,1);
+  assert.equal(restorations[0].metadata.sourceRevision,1);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS count FROM atlas_workspace_revisions WHERE workspace_id=?').get(made.body.id).count,3);
+});
+
+test('restauración: no puede acceder a otra organización aunque conozca su ID',async()=>{
+  const {call}=fixture();
+  const base='/api/v1/tenants/org-b/workspaces';
+  const created=await call('owner@b.test','POST',base,{name:'Privado',state:makeEmpty()});
+  const alien='/api/v1/tenants/org-a/workspaces/'+created.body.id+'/revisions';
+  assert.equal((await call('owner@a.test','GET',alien)).status,404);
+  assert.equal((await call('owner@a.test','PUT',alien+'/1/restore',{revision:1})).status,404);
+  assert.equal((await call('owner@a.test','GET',base+'/'+created.body.id+'/revisions')).status,403);
+});
+
+test('límite de tamaño: rechaza cuerpo mayor a 1 MiB sin Content-Length',async()=>{
+  const {call}=fixture();
+  const large='x'.repeat(1024*1024+100);
+  const response=await call('owner@a.test','POST','/api/v1/tenants/org-a/workspaces',{name:large,state:makeEmpty()});
+  assert.equal(response.status,413);
 });
