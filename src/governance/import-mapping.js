@@ -32,7 +32,7 @@ export function inspectIncidentCSV(text){
 export function suggestColumnMapping(headers){
  const suggestions={};
  for(const field of IMPORT_FIELDS){
-  const matches=headers.map((h,i)=>ALIASES[field.key].includes(normalized(h))?i:-1).filter(i=>i>=0);
+  const matches=headers.map((h,i)=>ALIASES[field.key].some(alias=>normalized(alias)===normalized(h))?i:-1).filter(i=>i>=0);
   suggestions[field.key]=matches.length===1?String(matches[0]):'';
  }
  return suggestions;
