@@ -44,11 +44,13 @@ try{
  assert.ok(await page.getByText('Incidentes, recuperación y tendencias.').isVisible());
  assert.equal(await page.locator('.itsm-month').count(),12); // dos series de seis meses
  assert.ok(await page.locator('tr').filter({hasText:'DEMO-112'}).count()>0);
- const incidentCSV='incident_id,service_id,priority,opened_at,resolved_at,summary\\n'
-   +'CSV-E2E-01,s-core,P2,2026-11-18T10:00:00-03:00,2026-11-18T10:42:00-03:00,"Ticket, resuelto"\\n'
-   +'CSV-E2E-02,s-channel,P1,2026-11-18T12:30:00-03:00,,Incidente pendiente\\n';
+ const incidentCSV=[
+ 'incident_id,service_id,priority,opened_at,resolved_at,summary',
+ 'CSV-E2E-01,s-core,P2,2026-11-18T10:00:00-03:00,2026-11-18T10:42:00-03:00,"Ticket, resuelto"',
+ 'CSV-E2E-02,s-channel,P1,2026-11-18T12:30:00-03:00,,Incidente pendiente'
+ ].join(String.fromCharCode(10));
  page.once('dialog',d=>d.accept());
- await page.locator('#incident-file').setInputFiles({name:'importacion-it-smoke.csv',mimeType:'text/csv',buffer:Buffer.from(incidentCSV.replaceAll('\\\\n','\\n'))});
+ await page.locator('#incident-file').setInputFiles({name:'importacion-itsm-smoke.csv',mimeType:'text/csv',buffer:Buffer.from(incidentCSV)});
  await page.waitForFunction(()=>document.querySelector('#view-root')?.textContent?.includes('CSV-E2E-01'));
  assert.equal(await page.locator('tr').filter({hasText:'CSV-E2E-01'}).count(),1);
  assert.ok((await page.locator('tr').filter({hasText:'CSV-E2E-01'}).innerText()).includes('42 min'));
