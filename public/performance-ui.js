@@ -42,7 +42,7 @@ export function performanceView(state,today,{esc,mini,semaphore,empty,nfmt,fmtPc
       <div class="summary-footnotes"><span>${kpis.length} KPI · ${values.filter(x=>x.r.level==='ok').length} en meta · ${problems} desviados</span><span>Datos ficticios iniciales o locales · Sin telemetría en vivo</span></div></div>
       <div class="summary-aside"><div class="summary-aside-header">AVANCE MEDIO DE OKR</div><div class="summary-aside-value">${mean===null?'S/D':nfmt(mean)+'%'}</div><span>${measured.length} objetivo(s) con resultados medidos</span></div></div></section>
     <div class="section-eyeline">01 / INDICADORES DE DESEMPEÑO</div>
-    <section class="executive-panel"><div class="executive-panel-head"><div><span class="executive-overline">PERFORMANCE CONTROL</span><h3>KPI · valores, metas y responsables</h3><p>El estado y la medición se recalculan usando las reglas descritas en cada indicador.</p></div>${mini('+ Nuevo KPI','kpi')}</div>
+    <section class="executive-panel"><div class="executive-panel-head"><div><span class="executive-overline">PERFORMANCE CONTROL</span><h3>KPI · valores, metas y responsables</h3><p>El estado y la medición se recalculan usando las reglas descritas en cada indicador.</p></div>${mini('+ Nuevo KPI','kpi')}${!kpis.length&&!objectives.length?mini('Cargar ejemplos','seed-performance','','secondary'):''}</div>
       ${kpiMarkup?'<div class="performance-kpi-grid">'+kpiMarkup+'</div>':empty('No hay KPI configurados','Registrá un indicador con meta y responsable.')}
     </section>
     <div class="section-eyeline">02 / OBJETIVOS Y RESULTADOS CLAVE</div>
