@@ -8,6 +8,8 @@ import {METRICS,KPI_OPTIONS,ensurePerformanceState,seedDemoPerformance,validateP
 import {performanceView as renderPerformanceView} from './performance-ui.js';
 import {ensureIncidentState,seedDemoIncidents,validateIncidentState,parseIncidentCSV,importIncidents,resolveIncident,incidentMetrics,SAMPLE_CSV} from './lib/governance/incidents.js';
 import {incidentsView as renderIncidentsView} from './incidents-ui.js';
+import {inspectIncidentCSV,suggestColumnMapping,suggestServiceMap,suggestPriorityMap,uniqueMappedValues,parseMappedIncidentCSV} from './lib/governance/import-mapping.js';
+import {importWizardView} from './import-wizard-ui.js';
 
 const STORAGE_KEY='atlas-governance-workspace-v1';
 const today=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')};
@@ -42,6 +44,8 @@ const viewMeta={
  committee:['Comité de Tecnología','Decisiones, responsables y compromisos ejecutivos']
 };
 let view='overview';
+let incidentFilters={verticalId:'',serviceId:''};
+let importDraft=null;
 let modal=null;
 let toastTimeout=null;
 let storageOK=true;
@@ -338,11 +342,32 @@ function render(){
  $('view-title').textContent=meta[0];$('view-subtitle').textContent=meta[1];
  $('breadcrumb-current').textContent=meta[0].toUpperCase();
  $('environment-label').textContent=state.kind==='demo'?'DATOS FICTICIOS DE DEMOSTRACIÓN':state.kind==='local'?'ESPACIO LOCAL SIN DATOS DE DEMOSTRACIÓN':'DATOS LOCALES EDITADOS · PUEDE CONTENER EJEMPLOS FICTICIOS';
- const pages={overview,performance:()=>renderPerformanceView(state,today(),{esc,mini,semaphore,empty,nfmt,fmtPct}),incidents:()=>renderIncidentsView(state,today(),{esc,mini,semaphore,empty,nfmt,fmtPct}),verticals:verticalsView,capacity:capacityView,assessments:assessmentsView,risks:risksView,actions:actionsView,continuity:continuityView,committee:committeeView};
+ const pages={overview,performance:()=>renderPerformanceView(state,today(),{esc,mini,semaphore,empty,nfmt,fmtPct}),incidents:()=>renderIncidentsView(state,today(),{esc,mini,semaphore,empty,nfmt,fmtPct},incidentFilters),verticals:verticalsView,capacity:capacityView,assessments:assessmentsView,risks:risksView,actions:actionsView,continuity:continuityView,committee:committeeView};
  $('view-root').innerHTML=(pages[view]||overview)();
  for(const node of document.querySelectorAll('[data-view]'))node.classList.toggle('selected',node.dataset.view===view);
+ if(view==='incidents'&&importDraft)drawImportWizard();
 }
 
+function drawImportWizard(){
+ const root=$('itsm-import-workspace');
+ if(!root||!importDraft)return;
+ try{root.innerHTML=importWizardView(importDraft,state,{esc});}
+ catch(err){root.innerHTML='<p class="mapping-error">'+esc(err.message||'Error de mapeo')+'</p>';}
+}
+function mappingSelections(){
+ if(!importDraft)throw new Error('Primero seleccioná un archivo CSV.');
+ const form=$('incident-mapping-form');
+ if(!form)throw new Error('El asistente de importación no está disponible.');
+ const data=new FormData(form);
+ const columns=Object.fromEntries(['incident_id','service_id','priority','opened_at','resolved_at','summary'].map(key=>[key,data.get('col_'+key)||'']));
+ const serviceValues=uniqueMappedValues(importDraft.rows,columns.service_id);
+ const priorityValues=uniqueMappedValues(importDraft.rows,columns.priority);
+ return {
+  columns,format:data.get('date_format')||'iso',offset:String(data.get('timezone_offset')||'').trim(),
+  services:Object.fromEntries(serviceValues.map((raw,i)=>[raw,data.get('service_'+i)||''])),
+  priorities:Object.fromEntries(priorityValues.map((raw,i)=>[raw,data.get('priority_'+i)||'']))
+ };
+}
 const input=(name,label,type='text',value='',options={})=>`<div class="field ${options.wide?'wide':''}"><label for="field-${esc(name)}">${esc(label)}</label><input id="field-${esc(name)}" name="${esc(name)}" type="${esc(type)}" value="${esc(value)}" ${options.required?'required':''} ${options.min!==undefined?'min="'+esc(options.min)+'"':''} ${options.max!==undefined?'max="'+esc(options.max)+'"':''} ${options.step?'step="'+esc(options.step)+'"':''} maxlength="180"></div>`;
 const select=(name,label,values,value='',wide=false)=>`<div class="field ${wide?'wide':''}"><label for="field-${esc(name)}">${esc(label)}</label><select id="field-${esc(name)}" name="${esc(name)}" required>${values.map(x=>`<option value="${esc(x[0])}" ${x[0]===value?'selected':''}>${esc(x[1])}</option>`).join('')}</select></div>`;
 const textarea=(name,label,value='',required=true)=>`<div class="field wide"><label for="field-${esc(name)}">${esc(label)}</label><textarea id="field-${esc(name)}" name="${esc(name)}" maxlength="1500" ${required?'required':''}>${esc(value)}</textarea></div>`;
@@ -368,7 +393,7 @@ function openForm(type,id=''){
     input('resolvedAt','Resolución ISO con zona (ej. 2026-11-18T12:00:00-03:00)','text','',{required:true,wide:true});
    submit='Registrar cierre';
  }
- else if(type==='kpi'){title='Nuevo KPI tecnológico';description='Indicadores corporativos calculados automáticamente a partir de registros de ATLAS; elegí la fórmula y la meta.';fields=select('metric','Indicador y fórmula',KPI_OPTIONS)+input('name','Nombre ejecutivo del KPI','text','',{required:true,wide:true})+input('target','Meta','number','',{required:true,step:'any'})+input('owner','Responsable de seguimiento','text','',{required:true});}
+ else if(type==='kpi'){title='Nuevo KPI tecnológico';description='Indicadores corporativos calculados automáticamente a partir de registros de ATLAS; elegí la fórmula y la meta.';fields=select('metric','Indicador y fórmula',KPI_OPTIONS)+input('name','Nombre ejecutivo del KPI','text','',{required:true,wide:true})+input('target','Meta','number','',{required:true,step:'any'})+input('owner','Responsable de seguimiento','text','',{required:true})+select('verticalId','Alcance del indicador',[['','Corporativo (todas las verticales)'],...vertOptions()]);}
  else if(type==='okr'){title='Nuevo objetivo tecnológico';description='El objetivo se mide mediante resultados clave vinculados a los KPI disponibles.';fields=input('title','Objetivo estratégico','text','',{required:true,wide:true})+input('owner','Responsable del objetivo','text','',{required:true})+select('verticalId','Alcance',[['','Corporativo'],...vertOptions()])+input('startDate','Inicio','date',today(),{required:true})+input('dueDate','Fecha objetivo','date','',{required:true});}
  else if(type==='kr'){title='Vincular resultado clave';description='El KR evoluciona automáticamente al cambiar los registros que alimentan el KPI. Definí una línea base y una meta de mejora.';const available=state.objectives.filter(o=>o.status==='activo');if(!available.length||!state.kpis.length)return notice('Primero registrá un objetivo activo y al menos un KPI.',true);fields=select('objectiveId','Objetivo',available.map(o=>[o.id,o.title]),id)+select('kpiId','Indicador medido',state.kpis.map(k=>[k.id,k.name]))+input('baseline','Línea base','number','',{required:true,step:'any'})+input('target','Meta del resultado clave','number','',{required:true,step:'any'});}
  else if(type==='okr-close'){const obj=state.objectives.find(o=>o.id===id);if(!obj)return notice('Objetivo inexistente.',true);title='Cerrar objetivo tecnológico';description='Se congelarán los resultados y el avance en la fecha de cierre. El cierre no implica necesariamente que se alcanzó la meta.';fields='<div class="modal-note">'+esc(obj.title)+'</div>'+textarea('evidence','Evidencia o acta del cierre');submit='Registrar cierre';}
@@ -444,6 +469,23 @@ document.addEventListener('click',e=>{
  const nav=e.target.closest('[data-view]');if(nav){switchView(nav.dataset.view);return;}
  const item=e.target.closest('[data-open]');if(item){openForm(item.dataset.open,item.dataset.id||'');return;}
  const cmd=e.target.closest('[data-command]');if(!cmd)return;
+ if(cmd.dataset.command==='cancel-incident-import'){
+   importDraft=null;render();notice('Importación cancelada. No se modificaron los datos.');return;
+ }
+ if(cmd.dataset.command==='apply-incident-import'){
+   try{
+    const config=mappingSelections();
+    const rows=parseMappedIncidentCSV(importDraft.text,state,config);
+    const current=new Map(state.incidents.map(x=>[x.id,x]));
+    const fresh=rows.filter(x=>!current.has(x.id)).length;
+    const resolutions=rows.filter(x=>current.has(x.id)&&current.get(x.id).resolvedAt===null&&x.resolvedAt!==null).length;
+    if(!confirm('Lote de '+rows.length+' incidente(s): '+fresh+' nuevo(s) y hasta '+resolutions+' resolución(es). Se validará todo antes de modificar el workspace. ¿Confirmar?'))return;
+    const outcome=importIncidents(state,rows);
+    addEvent(state,'incident','CSV mapeado: '+outcome.inserted+' nuevos, '+outcome.updated+' resoluciones y '+outcome.unchanged+' repetidos.',today());
+    importDraft=null;save('Importación correcta: '+outcome.inserted+' nuevos y '+outcome.updated+' actualizados.');
+   }catch(err){notice('CSV rechazado: '+(err.message||'Error en el mapeo'),true);}
+   return;
+ }
  if(cmd.dataset.command==='incident-sample'){
    const objectUrl=URL.createObjectURL(new Blob(['\uFEFF'+SAMPLE_CSV],{type:'text/csv;charset=utf-8'}));
    const link=document.createElement('a');link.href=objectUrl;link.download='atlas-incidentes-ejemplo.csv';
@@ -473,20 +515,40 @@ $('dialog-x').addEventListener('click',closeForm);
 $('dialog-cancel').addEventListener('click',closeForm);
 $('record-dialog').addEventListener('close',()=>modal=null);
 document.addEventListener('change',async event=>{
+ if(event.target?.id==='itsm-vertical-filter'){
+   incidentFilters={verticalId:event.target.value||'',serviceId:''};render();return;
+ }
+ if(event.target?.id==='itsm-service-filter'){
+   incidentFilters.serviceId=event.target.value||'';render();return;
+ }
+ if(event.target?.closest('#incident-mapping-form')){
+   try{
+    const form=event.target.closest('form'),data=new FormData(form);
+    importDraft.columns=Object.fromEntries(['incident_id','service_id','priority','opened_at','resolved_at','summary'].map(key=>[key,data.get('col_'+key)||'']));
+    importDraft.format=data.get('date_format')||'iso';
+    importDraft.offset=data.get('timezone_offset')||'';
+    importDraft.services={...importDraft.services};
+    importDraft.priorities={...importDraft.priorities};
+    const svc=uniqueMappedValues(importDraft.rows,importDraft.columns.service_id);
+    const pri=uniqueMappedValues(importDraft.rows,importDraft.columns.priority);
+    for(const [i,raw] of svc.entries())if(data.has('service_'+i))importDraft.services[raw]=data.get('service_'+i)||'';
+    for(const [i,raw] of pri.entries())if(data.has('priority_'+i))importDraft.priorities[raw]=data.get('priority_'+i)||'';
+    if(event.target.name.startsWith('col_'))drawImportWizard();
+   }catch(err){notice(err.message||'Mapeo inválido.',true);}
+   return;
+ }
  if(event.target?.id!=='incident-file')return;
  const picker=event.target,file=picker.files?.[0];picker.value='';
  if(!file)return;
  if(file.size>512*1024)return notice('El CSV supera 512 KB. Dividilo en lotes más pequeños.',true);
  try{
-   const rows=parseIncidentCSV(await file.text(),state);
-   const ids=new Map(state.incidents.map(x=>[x.id,x]));
-   const newCount=rows.filter(r=>!ids.has(r.id)).length;
-   const candidateUpdates=rows.filter(r=>ids.has(r.id)&&ids.get(r.id).resolvedAt===null&&r.resolvedAt!==null).length;
-   if(!confirm('Importación local: '+rows.length+' fila(s). Nuevos: '+newCount+'. Posibles resoluciones de abiertos: '+candidateUpdates+'. Los IDs repetidos sin cambios se omiten. ¿Validar y aplicar todo el lote?'))return;
-   const outcome=importIncidents(state,rows);
-   addEvent(state,'incident','Importación CSV: '+outcome.inserted+' nuevo(s), '+outcome.updated+' cierre(s) actualizado(s), '+outcome.unchanged+' sin cambios.',today());
-   save('Importados '+outcome.inserted+' nuevo(s), '+outcome.updated+' actualizado(s), '+outcome.unchanged+' existentes.');
- }catch(err){notice('CSV rechazado sin aplicar cambios: '+(err.message||'Error de importación.'),true)}
+   const textCSV=await file.text();
+   const preview=inspectIncidentCSV(textCSV);
+   const columns=suggestColumnMapping(preview.headers);
+   importDraft={...preview,text:textCSV,columns,services:{},priorities:{},format:'iso',offset:''};
+   drawImportWizard();
+   $('itsm-import-workspace')?.scrollIntoView({behavior:'smooth',block:'nearest'});
+ }catch(err){importDraft=null;notice('No se pudo preparar el CSV: '+(err.message||'archivo inválido'),true);}
 });
 $('import-file').addEventListener('change',async e=>{
  const file=e.target.files?.[0];e.target.value='';if(!file)return;
