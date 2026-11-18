@@ -3,6 +3,7 @@ import {
   actionOverdue, capacityStatus, availability, continuity, registerAssessment,
   registerCapacity, teamStatus, registerTeamCapacity, registerAction, completeAction, validateRisk, addEvent
 } from './lib/governance/core.js';
+import {worstSignal, riskSignal, actionSignal, infrastructureSignal, workforceSignal, assessmentSignal, serviceSignal, verticalSignal, executiveSummary, riskMatrix} from './lib/governance/insights.js';
 
 const STORAGE_KEY='atlas-governance-workspace-v1';
 const today=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')};
@@ -14,6 +15,11 @@ const nfmt=v=>new Intl.NumberFormat('es-AR',{maximumFractionDigits:2}).format(Nu
 const short=v=>v&&v.length>75?v.slice(0,72)+'…':v;
 const empty=(title='Sin registros',body='Podés cargar información desde el botón superior.')=>'<div class="empty-state"><strong>'+esc(title)+'</strong>'+esc(body)+'</div>';
 const tag=(text,tone='neutral')=>'<span class="tag '+tone+'">'+esc(text)+'</span>';
+const semaphore=signal=>'<span class="signal-chip signal-'+signal.level+'" title="'+esc(signal.reason)+'"><i aria-hidden="true"></i>'+esc(signal.label)+'</span>';
+const signalLine=(name,signal,detail='',navigate='')=>'<div class="signal-line"><div class="signal-line-label"><span>'+esc(name)+'</span><small>'+esc(detail)+'</small></div>'+semaphore(signal)+(navigate?'<button class="signal-arrow" type="button" data-open="view:'+esc(navigate)+'" aria-label="Ver '+esc(name)+'">↗</button>':'')+'</div>';
+const indicator=(label,value,description,signal)=>'<article class="executive-kpi signal-border-'+signal.level+'"><div class="executive-kpi-head"><span>'+esc(label)+'</span>'+semaphore(signal)+'</div><strong>'+esc(value)+'</strong><p>'+esc(description)+'</p></article>';
+const percentBar=(percent,signal,limit)=>'<div class="capacity-track" role="img" aria-label="Utilización '+nfmt(percent)+' por ciento; umbral '+nfmt(limit)+' por ciento"><span class="capacity-fill capacity-'+signal.level+'" style="width:'+Math.max(0,Math.min(100,percent||0))+'%"></span><i class="capacity-threshold" style="left:'+Math.max(0,Math.min(100,limit||0))+'%" aria-hidden="true"></i></div>';
+const heatmap=(risks)=>'<div class="heatmap-frame"><div class="heatmap-y-label">PROBABILIDAD ↑</div><div class="heatmap-container"><div class="heatmap-grid">'+riskMatrix(risks).flat().map(c=>'<button type="button" data-open="view:risks" class="heatmap-cell heatmap-'+c.level+(c.count?' populated':'')+'" aria-label="Probabilidad '+c.probability+', impacto '+c.impact+': '+c.count+' riesgos abiertos" title="P '+c.probability+' × I '+c.impact+' = '+c.score+'/25 · '+c.count+' riesgos">'+(c.count?'<b>'+c.count+'</b>':'<small>·</small>')+'</button>').join('')+'</div><div class="heatmap-x-label">IMPACTO →</div></div></div>';
 const mini=(label,open,id='',style='')=>'<button class="mini-button '+style+'" type="button" data-open="'+esc(open)+'" data-id="'+esc(id)+'">'+esc(label)+'</button>';
 const getVertical=id=>state.verticals.find(v=>v.id===id);
 const getRisk=id=>state.risks.find(r=>r.id===id);
@@ -53,130 +59,251 @@ function save(message){
 }
 function notice(message,error=false){const el=$('toast');el.textContent=message;el.className='toast show'+(error?' error':'');clearTimeout(toastTimeout);toastTimeout=setTimeout(()=>el.className='toast',4300)}
 function overview(){
- const s=dashboard(state,today());
- const risky=state.risks.filter(r=>r.status==='abierto').sort((a,b)=>severity(b).score-severity(a).score);
- const alerts=risky.filter(r=>!state.actions.some(a=>a.riskId===r.id)).slice(0,5);
- const due=state.actions.filter(a=>a.status!=='completada').sort((a,b)=>a.dueDate.localeCompare(b.dueDate)).slice(0,5);
- const dr=state.services.filter(s=>Number(s.criticality)===1&&!continuity(s).ok);
- const cap=state.capacities.filter(c=>capacityStatus(c).warning);
- const teams=state.teamCapacities.filter(c=>teamStatus(c).warning);
- return `<div class="grid-kpis">
-   <article class="kpi danger"><div class="kpi-label">RIESGOS CRÍTICOS SIN PLAN</div><div class="kpi-value">${s.criticalUnmanaged}</div><div class="kpi-hint">${s.unmanaged} riesgos abiertos sin tratamiento de ${s.activeRisks} activos</div></article>
-   <article class="kpi warn"><div class="kpi-label">ACCIONES VENCIDAS</div><div class="kpi-value">${s.overdue}</div><div class="kpi-hint">Plazos superados, sin evidencia de cierre</div></article>
-   <article class="kpi warn"><div class="kpi-label">SERVICIOS CRÍTICOS / DR NO VALIDADO</div><div class="kpi-value">${s.drGaps}</div><div class="kpi-hint">Prueba parcial, fallida o no evaluada</div></article>
-   <article class="kpi"><div class="kpi-label">ALERTAS DE CAPACIDAD</div><div class="kpi-value">${s.capacityAlerts+s.teamAlerts}</div><div class="kpi-hint">Recursos: ${s.capacityAlerts} · Equipos: ${s.teamAlerts}</div></article>
+ const ts=today(), x=executiveSummary(state,ts);
+ const untreated=state.risks.filter(r=>r.status==='abierto'&&riskSignal(r,state.actions,ts).level==='critical')
+   .sort((a,b)=>severity(b).score-severity(a).score).slice(0,4);
+ const due=state.actions.filter(a=>a.status!=='completada')
+   .sort((a,b)=>a.dueDate.localeCompare(b.dueDate)).slice(0,4);
+ const dimension=[
+  ['Riesgos',worstSignal(state.risks.filter(r=>r.status==='abierto').map(r=>riskSignal(r,state.actions,ts))),x.activeRisks+' abiertos','risks'],
+  ['Capacity',worstSignal([...state.capacities.map(infrastructureSignal),...state.teamCapacities.map(workforceSignal)]),x.capacityAlerts+x.teamAlerts+' alertas','capacity'],
+  ['Continuidad',worstSignal(state.services.filter(s=>Number(s.criticality)===1).map(s=>serviceSignal(s,ts))),x.criticalServices+' servicios críticos','continuity'],
+  ['Ejecución',worstSignal(state.actions.filter(a=>a.status!=='completada').map(a=>actionSignal(a,ts))),x.overdue+' vencidas','actions'],
+  ['Assessments',worstSignal(state.assessments.map(assessmentSignal)),x.lowAssessments+' brechas','assessments']
+ ];
+ const financeSignal=x.pendingDecisions?{level:'warning',label:'Atención',reason:'Existen decisiones abiertas para comité.'}:{level:state.decisions.length?'ok':'unknown',label:state.decisions.length?'En control':'Sin evaluar',reason:'Sin decisiones pendientes registradas.'};
+ const riskCritical=x.criticalUnmanaged?{level:'critical',label:'Crítico',reason:'Hay riesgos críticos sin tratamiento'}:{level:x.unmanaged?'warning':x.activeRisks?'ok':'unknown',label:x.unmanaged?'Atención':x.activeRisks?'En control':'Sin evaluar',reason:'Cobertura de tratamiento registrada'};
+ const overdueSignal=x.overdue?{level:'critical',label:'Crítico',reason:'Existen acciones vencidas'}:{level:state.actions.length?'ok':'unknown',label:state.actions.length?'En control':'Sin evaluar',reason:'No se registran acciones vencidas'};
+ const continuitySignal=x.unverified?{level:'warning',label:'Atención',reason:'Continuidad de servicios críticos no validada'}:{level:x.criticalServices?'ok':'unknown',label:x.criticalServices?'En control':'Sin evaluar',reason:'Estado de pruebas de continuidad'};
+ const capacitySignal=x.capacityAlerts+x.teamAlerts?{level:'critical',label:'Crítico',reason:'Capacidad o equipos exceden umbrales'}:{level:state.capacities.length+state.teamCapacities.length?'ok':'unknown',label:state.capacities.length+state.teamCapacities.length?'En control':'Sin evaluar',reason:'Controles de capacidad registrados'};
+ const availSignal=x.slaBreaches?{level:'critical',label:'Crítico',reason:'Incumplimiento observado de SLA'}:{level:x.averageAvailability!==null?'ok':'unknown',label:x.averageAvailability!==null?'En control':'Sin evaluar',reason:'Disponibilidad calculada a partir de registros'};
+ const verticalRows=state.verticals.map(v=>{
+   const signal=verticalSignal(state,v.id,ts);
+   const count=state.risks.filter(r=>r.verticalId===v.id&&r.status==='abierto').length;
+   const cap=worstSignal([...state.capacities.filter(c=>c.verticalId===v.id).map(infrastructureSignal),...state.teamCapacities.filter(c=>c.verticalId===v.id).map(workforceSignal)]);
+   const cont=worstSignal(state.services.filter(s=>s.verticalId===v.id).map(serv=>serviceSignal(serv,ts)));
+   const due=state.actions.filter(a=>a.status!=='completada'&&state.risks.some(r=>r.verticalId===v.id&&r.id===a.riskId));
+   const acts=worstSignal(due.map(a=>actionSignal(a,ts)));
+   return '<tr><td><div class="executive-table-title">'+esc(v.name)+'</div><div class="executive-table-meta">'+esc(v.owner)+'</div></td><td>'+semaphore(signal)+'</td><td><span class="mono-n">'+count+'</span> abiertos</td><td>'+semaphore(cap)+'</td><td>'+semaphore(cont)+'</td><td>'+semaphore(acts)+'</td></tr>';
+ }).join('');
+ return `<section class="executive-summary signal-border-${x.status.level}" aria-label="Síntesis ejecutiva">
+  <div class="executive-summary-upper">
+    <div><span class="executive-overline">EXECUTIVE SITUATION REPORT / ${esc(ts)}</span>
+      <h2>Estado de la operación <span class="executive-status-mark">${semaphore(x.status)}</span></h2>
+      <p class="executive-summary-text">${esc(x.sentence)}</p>
+      <div class="summary-footnotes"><span>Indicadores derivados de ${state.verticals.length} verticales y ${state.services.length} servicios</span><span>Datos del navegador · No es telemetría en vivo</span></div>
+    </div>
+    <div class="summary-aside"><div class="summary-aside-header">FRENTE DE DECISIONES</div><div class="summary-aside-value">${x.pendingDecisions}</div><span>Temas pendientes de comité</span><div class="summary-aside-bottom">${semaphore(financeSignal)} ${mini('Ver comité ↗','view:committee','','secondary')}</div></div>
+  </div>
+ </section>
+ <div class="section-eyeline">01 / PANEL DE CONTROL · EXCEPCIONES PRIORITARIAS</div>
+ <div class="executive-dashboard">
+  <div class="executive-kpis">
+   ${indicator('RIESGOS CRÍTICOS SIN PLAN',x.criticalUnmanaged,'Exposición ≥15/25 sin acción asignada',riskCritical)}
+   ${indicator('ACCIONES VENCIDAS',x.overdue,'Compromisos sin evidencia de cierre',overdueSignal)}
+   ${indicator('CONTINUIDAD NO VALIDADA',x.unverified,'Servicios Tier 1 sin prueba DR aprobada',continuitySignal)}
+   ${indicator('ALERTAS DE CAPACIDAD',x.capacityAlerts+x.teamAlerts,'Recursos y equipos fuera de umbral',capacitySignal)}
+  </div>
+  <section class="executive-panel readiness-panel"><div class="executive-panel-head"><div><span class="executive-overline">DOMINIOS DE CONTROL</span><h3>Lectura gerencial</h3></div></div>
+    ${dimension.map(d=>signalLine(...d)).join('')}
+  </section>
  </div>
- <div class="section-eyeline">01 / SITUACIÓN OPERATIVA Y EXPOSICIÓN</div>
- <div class="layout-two">
-  <section class="panel"><div class="panel-head"><div><h2>Riesgos que requieren decisión</h2><p>Priorizados por probabilidad × impacto; sin plan asociado.</p></div>${mini('Registrar riesgo','risk')}</div>
-   ${alerts.length?'<ul class="list">'+alerts.map(r=>`<li><div class="item-line"><div><div class="item-title">${esc(r.title)}</div><div class="item-detail">${esc(getVertical(r.verticalId)?.name||'Sin vertical')} · Responsable: ${esc(r.owner)} · Riesgo ${severity(r).score}/25</div></div><div class="item-actions">${tag('Sin plan','red')}${mini('Crear plan','action',r.id)}</div></div></li>`).join('')+'</ul>':empty('Sin riesgos pendientes de plan','Los riesgos abiertos tienen un tratamiento registrado.')}
+ <div class="executive-microline">
+  <div><span class="micro-label">DISPONIBILIDAD MEDIA OBSERVADA</span><strong>${x.averageAvailability===null?'S/D':fmtPct(x.averageAvailability)}</strong>${semaphore(availSignal)}<small>Promedio simple entre servicios con datos · no ponderado</small></div>
+  <div><span class="micro-label">DR APROBADO VIGENTE</span><strong>${x.criticalServices?x.provenDR+'/'+x.criticalServices:'S/D'}</strong>${semaphore(continuitySignal)}<small>Tier 1 · criterio ilustrativo: prueba ≤180 días</small></div>
+  <div><span class="micro-label">TRATAMIENTO DE RIESGOS</span><strong>${x.riskTreatmentPct===null?'S/D':fmtPct(x.riskTreatmentPct)}</strong>${semaphore(riskCritical)}<small>Abiertos con al menos una acción</small></div>
+ </div>
+ <div class="section-eyeline">02 / HEALTH CHECK · VERTICALES TECNOLÓGICAS</div>
+ <section class="executive-panel"><div class="executive-panel-head"><div><span class="executive-overline">TECHNOLOGY GOVERNANCE MATRIX</span><h3>Semáforo por vertical</h3><p>Estado consolidado según la peor señal registrada; gris indica información ausente.</p></div>${mini('Abrir verticales ↗','view:verticals','','secondary')}</div>
+  ${verticalRows?'<div class="table-wrap"><table class="data-table executive-data-table"><thead><tr><th>VERTICAL / RESPONSABLE</th><th>ESTADO</th><th>RIESGOS</th><th>CAPACITY</th><th>CONTINUIDAD</th><th>ACCIONES</th></tr></thead><tbody>'+verticalRows+'</tbody></table></div>':empty('Sin verticales registradas','Agregá una vertical para habilitar el semáforo consolidado.')}
+ </section>
+ <div class="section-eyeline">03 / RISK INTELLIGENCE · PRIORIZACIÓN</div>
+ <div class="layout-two executive-lower">
+  <section class="executive-panel"><div class="executive-panel-head"><div><span class="executive-overline">RISK EXPOSURE / 5 × 5</span><h3>Matriz de riesgos</h3><p>Riesgos abiertos por probabilidad e impacto. Los tonos son niveles de exposición, no estados de tratamiento.</p></div>${mini('Registro de riesgos ↗','view:risks','','secondary')}</div>
+   ${heatmap(state.risks)}<div class="heatmap-legend"><span><i class="legend-spot heatmap-ok"></i> Bajo / medio</span><span><i class="legend-spot heatmap-warning"></i> Alto</span><span><i class="legend-spot heatmap-critical"></i> Crítico</span></div>
   </section>
-  <section class="panel"><div class="panel-head"><div><h2>Compromisos próximos</h2><p>Acciones abiertas ordenadas por vencimiento.</p></div>${mini('Ver acciones','view:actions','','secondary')}</div>
-   ${due.length?'<ul class="list">'+due.map(a=>`<li><div class="item-line"><div><div class="item-title">${esc(a.title)}</div><div class="item-detail">${esc(a.owner)} · Vence ${esc(a.dueDate)}</div></div>${actionOverdue(a,today())?tag('Vencida','red'):tag(a.status==='en-curso'?'En curso':'Pendiente','amber')}</div></li>`).join('')+'</ul>':empty('Sin acciones pendientes','Registrá planes asociados a riesgos para iniciar el seguimiento.')}
+  <section class="executive-panel"><div class="executive-panel-head"><div><span class="executive-overline">FOLLOW-UP / GOVERNANCE</span><h3>Acciones y riesgos prioritarios</h3><p>Excepciones que requieren responsable, plan o decisión.</p></div></div>
+   <div class="executive-priority-list">
+    ${untreated.length?untreated.map(r=>'<div class="priority-record">'+semaphore(riskSignal(r,state.actions,ts))+'<div><strong>'+esc(r.title)+'</strong><small>'+esc(r.owner)+' · exposición '+severity(r).score+'/25</small></div>'+mini('Crear plan ↗','action',r.id)+'</div>').join(''):empty('Sin riesgos críticos pendientes','No hay riesgos críticos sin tratamiento registrados.')}
+    ${due.filter(a=>actionSignal(a,ts).level==='critical').map(a=>'<div class="priority-record">'+semaphore(actionSignal(a,ts))+'<div><strong>'+esc(a.title)+'</strong><small>'+esc(a.owner)+' · vence '+esc(a.dueDate)+'</small></div>'+mini('Ver acciones ↗','view:actions','','secondary')+'</div>').join('')}
+   </div>
   </section>
  </div>
- <div class="section-eyeline">02 / GOBIERNO DE LA CONTINUIDAD</div>
- <div class="layout-two layout-equal">
-  <section class="panel"><div class="panel-head"><div><h2>Continuidad sin evidencia suficiente</h2><p>Servicios de criticidad 1 sin ensayo DR aprobado.</p></div>${mini('Abrir continuidad','view:continuity','','secondary')}</div>
-  ${dr.length?'<ul class="list">'+dr.map(s=>`<li><div class="item-line"><div><div class="item-title">${esc(s.name)}</div><div class="item-detail">RTO objetivo: ${esc(s.rtoMin)} min · RPO objetivo: ${esc(s.rpoMin)} min</div></div>${tag(continuity(s).label,'amber')}</div></li>`).join('')+'</ul>':empty('Continuidad registrada','No hay servicios críticos con pruebas pendientes según los registros.')}
-  </section>
-  <section class="panel"><div class="panel-head"><div><h2>Capacidad en umbral</h2><p>Mediciones que requieren evaluación de crecimiento.</p></div>${mini('Cargar capacidad','capacity')}</div>
-  ${cap.length?'<ul class="list">'+cap.slice(0,6).map(c=>`<li><div class="item-line"><div><div class="item-title">${esc(c.name)}</div><div class="item-detail">${esc(getVertical(c.verticalId)?.name||'')} · Umbral ${nfmt(c.thresholdPct)}%</div></div>${tag(fmtPct(capacityStatus(c).utilization),'amber')}</div></li>`).join('')+'</ul>':empty('Sin alertas vigentes','Los recursos cargados permanecen bajo los umbrales definidos.')}
-  </section>
- </div>
- <div class="section-eyeline">03 / RECORRIDO DE GESTIÓN</div>
- <section class="panel"><div class="process-flow"><div class="process-step"><strong>01 / EVALUAR</strong><p>Registrar un assessment o medición de capacidad.</p></div><div class="process-step"><strong>02 / DETECTAR</strong><p>El sistema crea un riesgo por brechas de madurez o capacidad.</p></div><div class="process-step"><strong>03 / ACTUAR</strong><p>Asignar un plan, responsable, fecha y evidencia.</p></div><div class="process-step"><strong>04 / VALIDAR</strong><p>Confirmar acciones y validar el cierre del riesgo.</p></div></div></section>
- <div class="section-eyeline">04 / ACTIVIDAD REGISTRADA</div>
- <section class="panel"><ul class="list">${state.events.length?state.events.slice(0,7).map(e=>`<li><div class="item-line"><div><div class="item-title">${esc(e.text)}</div><div class="item-detail">${esc(e.date)} · ${esc(e.type)}</div></div></div></li>`).join(''):'<li>Sin actividad todavía.</li>'}</ul></section>`;
+ <div class="section-eyeline">04 / TRAZABILIDAD DE GESTIÓN</div>
+ <section class="executive-panel"><div class="executive-panel-head"><div><h3>De la brecha al cierre verificable</h3><p>Un riesgo no se considera mitigado únicamente por haber completado la acción.</p></div></div>
+  <div class="process-flow"><div class="process-step"><strong>01 / EVALUAR</strong><p>Assessment o capacidad registrada.</p></div><div class="process-step"><strong>02 / IDENTIFICAR</strong><p>Riesgo y criticidad calculados.</p></div><div class="process-step"><strong>03 / EJECUTAR</strong><p>Plan, responsable, plazo y evidencia.</p></div><div class="process-step"><strong>04 / VALIDAR</strong><p>Verificación independiente del cierre.</p></div></div>
+ </section>
+ `;
 }
+
 function verticalsView(){
+ const ts=today();
  const cards=state.verticals.map(v=>{
-   const assessments=state.assessments.filter(a=>a.verticalId===v.id);
-   const mean=assessments.length?assessments.reduce((a,b)=>a+Number(b.score),0)/assessments.length:null;
-   const risks=state.risks.filter(r=>r.verticalId===v.id&&r.status==='abierto');
-   const without=risks.filter(r=>riskTreatment(r,state.actions)==='Sin plan');
-   const capacities=state.capacities.filter(c=>c.verticalId===v.id&&capacityStatus(c).warning);
-   const teams=state.teamCapacities.filter(c=>c.verticalId===v.id&&teamStatus(c).warning);
-   return `<article class="vertical-card"><div class="vertical-head"><div><h3>${esc(v.name)}</h3><p>${esc(v.description)}<br>Responsable: ${esc(v.owner)}</p></div>${tag(without.length?'Prioridad de gestión':'En control',without.length?'amber':'neutral')}</div>
-   <div class="vertical-stats"><div class="vertical-stat"><span>MADUREZ / 5</span><strong>${mean===null?'—':nfmt(mean)}</strong></div><div class="vertical-stat"><span>RIESGOS SIN PLAN</span><strong>${without.length}</strong></div><div class="vertical-stat"><span>CAPACITY ALERTAS</span><strong>${capacities.length+teams.length}</strong></div></div>
+  const assessments=state.assessments.filter(a=>a.verticalId===v.id);
+  const mean=assessments.length?assessments.reduce((a,b)=>a+Number(b.score),0)/assessments.length:null;
+  const risks=state.risks.filter(r=>r.verticalId===v.id&&r.status==='abierto');
+  const without=risks.filter(r=>riskTreatment(r,state.actions)==='Sin plan');
+  const capacities=state.capacities.filter(c=>c.verticalId===v.id&&infrastructureSignal(c).level==='critical');
+  const teams=state.teamCapacities.filter(c=>c.verticalId===v.id&&workforceSignal(c).level==='critical');
+  const signal=verticalSignal(state,v.id,ts);
+  return `<article class="vertical-card signal-border-${signal.level}">
+    <div class="vertical-signal-top"><span class="executive-overline">VERTICAL / UNIDAD OPERATIVA</span>${semaphore(signal)}</div>
+    <h3>${esc(v.name)}</h3><p>${esc(v.description)}<br>Responsable: ${esc(v.owner)}</p>
+    <div class="vertical-stats"><div class="vertical-stat"><span>MADUREZ / 5</span><strong>${mean===null?'—':nfmt(mean)}</strong></div><div class="vertical-stat"><span>RIESGOS SIN PLAN</span><strong>${without.length}</strong></div><div class="vertical-stat"><span>CAPACITY CRÍTICA</span><strong>${capacities.length+teams.length}</strong></div></div>
+    <p class="mini-glossary">${esc(signal.reason)} ${signal.unknown?' · '+signal.unknown+' aspecto(s) sin evaluación.':''}</p>
    </article>`;
  }).join('');
- return `<section class="panel"><div class="panel-head"><div><h2>Verticales tecnológicas</h2><p>Dominio, accountability, madurez y exposición agregada.</p></div>${mini('Agregar vertical','vertical')}</div><div class="vertical-grid">${cards||empty('No hay verticales','Agregá una unidad de gestión para empezar.')}</div></section>`;
+ return `<section class="panel"><div class="panel-head"><div><h2>Estado por vertical tecnológica</h2><p>Madurez, riesgos, capacity y continuidad vinculados a cada responsable. El semáforo usa el peor estado registrado, sin ocultar datos faltantes.</p></div>${mini('Agregar vertical','vertical')}</div><div class="vertical-grid">${cards||empty('No hay verticales','Agregá una unidad de gestión para empezar.')}</div></section>`;
 }
 function capacityView(){
- const rows=state.capacities.map(c=>{
- const x=capacityStatus(c);
- return `<tr><td><span class="cell-title">${esc(c.name)}</span><span class="cell-meta">${esc(getVertical(c.verticalId)?.name||'')} · ${esc(c.owner)}</span></td><td class="number">${nfmt(c.used)} / ${nfmt(c.total)} ${esc(c.unit)}</td>
- <td><div class="priority ${x.warning?'warn':''}"><i class="dot"></i><span class="number">${fmtPct(x.utilization)}</span></div><div class="progress ${x.warning?'alert':''}"><span style="width:${Math.min(x.utilization||0,100)}%"></span></div><span class="cell-meta">Umbral: ${nfmt(x.limit)} %</span></td><td class="${x.futureWarning?'text-warn':'text-good'}">${fmtPct(x.forecast)}<span class="cell-meta">Crecimiento: ${nfmt(c.growthPct)}% mensual</span></td><td>${tag(x.warning?'Supera umbral':x.futureWarning?'Alerta proyectada':'Dentro del umbral',x.warning?'red':x.futureWarning?'amber':'neutral')}</td></tr>`;
+ const preview=state.capacities.slice(0,6).map(c=>{
+   const x=capacityStatus(c),signal=infrastructureSignal(c);
+   return `<article class="capacity-visual-card signal-border-${signal.level}"><div class="capacity-visual-card-head"><strong>${esc(c.name)}</strong>${semaphore(signal)}</div>
+    <div class="capacity-visual-card-number">${fmtPct(x.utilization)}</div>
+    ${percentBar(x.utilization,signal,x.limit)}
+    <p>Umbral ${nfmt(x.limit)}% · Proyección 3 meses: ${fmtPct(x.forecast)}<br>${esc(getVertical(c.verticalId)?.name||'Sin vertical')}</p></article>`;
  }).join('');
- return `<section class="panel"><div class="panel-head"><div><h2>Capacidad y previsión</h2><p>Utilización por recurso y proyección compuesta de tres meses (supuesto de crecimiento constante).</p></div>${mini('+ Nueva medición','capacity')}</div>
- ${rows?'<div class="table-wrap"><table class="data-table"><thead><tr><th>RECURSO / VERTICAL</th><th>USO Y TOTAL</th><th>UTILIZACIÓN</th><th>PROYECCIÓN 3 MESES</th><th>ESTADO</th></tr></thead><tbody>'+rows+'</tbody></table></div>':empty('Sin mediciones','Agregá una capacidad para registrar uso, límite y crecimiento.')}
- <div class="modal-note">Automatización real: al registrar una medición sobre el umbral, ATLAS crea un riesgo vinculado con estado «Sin plan». La proyección no es telemetría: se calcula exclusivamente con los valores ingresados.</div></section>
- <section class="panel"><div class="panel-head"><div><h2>Capacidad de los equipos y cobertura</h2><p>FTE disponibles, FTE asignados, capacidad de guardias y brechas de habilidades por equipo; no evalúa personas individuales.</p></div>${mini('+ Registrar capacidad de equipo','team')}</div>
- ${state.teamCapacities.length?'<div class="table-wrap"><table class="data-table"><thead><tr><th>EQUIPO / VERTICAL</th><th>ASIGNACIÓN / DISPONIBILIDAD</th><th>CARGA DE TRABAJO</th><th>COBERTURA</th><th>BRECHAS / SITUACIÓN</th></tr></thead><tbody>'+
- state.teamCapacities.map(t=>{const z=teamStatus(t);return `<tr><td><span class="cell-title">${esc(t.name)}</span><span class="cell-meta">${esc(getVertical(t.verticalId)?.name||'')} · ${esc(t.owner)}</span></td><td>${nfmt(t.allocatedFte)} / ${nfmt(t.availableFte)} FTE</td><td>${fmtPct(z.utilization)}<span class="cell-meta">Umbral de carga: ${nfmt(z.threshold)}%</span></td><td>${fmtPct(z.coverage)}</td><td>${tag(z.warning?'Requiere atención':'Dentro del umbral',z.warning?'amber':'neutral')}<span class="cell-meta">${esc(t.skillsGap||'Sin brechas informadas')}</span></td></tr>`;}).join('')+'</tbody></table></div>':empty('Sin registros de equipos','Registrá disponibilidad, asignación y cobertura de los equipos por vertical.')}
- <div class="modal-note">Si la carga alcanza el umbral, o la cobertura de guardias cae por debajo del 90%, se genera automáticamente un riesgo asociado al equipo. Los FTE son capacidad del área, no indicadores de desempeño individual.</div></section>`;
+ const rows=state.capacities.map(c=>{
+   const x=capacityStatus(c),signal=infrastructureSignal(c);
+   return `<tr><td><span class="cell-title">${esc(c.name)}</span><span class="cell-meta">${esc(getVertical(c.verticalId)?.name||'')} · ${esc(c.owner)}</span></td><td class="number">${nfmt(c.used)} / ${nfmt(c.total)} ${esc(c.unit)}</td>
+   <td><strong class="number">${fmtPct(x.utilization)}</strong>${percentBar(x.utilization,signal,x.limit)}<span class="cell-meta">Umbral: ${nfmt(x.limit)} %</span></td>
+   <td class="${x.futureWarning?'text-warn':'text-good'}">${fmtPct(x.forecast)}<span class="cell-meta">Crecimiento mensual: ${nfmt(c.growthPct)}%</span></td><td>${semaphore(signal)}</td></tr>`;
+ }).join('');
+ const teamRows=state.teamCapacities.map(t=>{
+   const x=teamStatus(t),signal=workforceSignal(t);
+   return `<tr><td><span class="cell-title">${esc(t.name)}</span><span class="cell-meta">${esc(getVertical(t.verticalId)?.name||'')} · ${esc(t.owner)}</span></td><td>${nfmt(t.allocatedFte)} / ${nfmt(t.availableFte)} FTE</td>
+   <td><strong class="number">${fmtPct(x.utilization)}</strong>${percentBar(x.utilization,signal,x.threshold)}</td>
+   <td><span class="number">${fmtPct(x.coverage)}</span><span class="cell-meta">${esc(t.skillsGap||'Sin brecha informada')}</span></td><td>${semaphore(signal)}</td></tr>`;
+ }).join('');
+ return `<div class="section-eyeline">01 / VISIÓN DE CAPACIDAD POR RECURSO</div>
+ ${preview?'<div class="capacity-card-grid">'+preview+'</div>':empty('Sin mediciones','Registrá capacity de infraestructura para ver niveles y proyecciones.')}
+ <section class="panel"><div class="panel-head"><div><h2>Infraestructura · utilización y previsión</h2><p>Utilización comparada con el umbral de cada recurso; la proyección a tres meses supone crecimiento mensual constante.</p></div>${mini('+ Nueva medición','capacity')}</div>
+ ${rows?'<div class="table-wrap"><table class="data-table"><thead><tr><th>RECURSO / VERTICAL</th><th>USO Y CAPACIDAD</th><th>UTILIZACIÓN Y UMBRAL</th><th>PROYECCIÓN</th><th>SEMÁFORO</th></tr></thead><tbody>'+rows+'</tbody></table></div>':empty('Sin mediciones','Agregá un recurso para registrar uso, límite y crecimiento.')}
+ <p class="mini-glossary">Semáforo: rojo cuando se alcanza el umbral individual; ámbar si faltan 10 puntos porcentuales o menos, o si la proyección a tres meses alcanza el umbral; verde en los demás casos.</p>
+ <div class="modal-note">Una medición nueva sobre el umbral genera un riesgo vinculado. Los valores son registros manuales, no telemetría en vivo.</div></section>
+ <section class="panel"><div class="panel-head"><div><h2>Equipos · carga y cobertura operativa</h2><p>FTE asignados, disponibles, brechas de habilidad y cobertura. La evaluación es de capacidad organizacional, no de personas.</p></div>${mini('+ Registrar capacidad de equipo','team')}</div>
+ ${teamRows?'<div class="table-wrap"><table class="data-table"><thead><tr><th>EQUIPO / VERTICAL</th><th>FTE ASIGNADOS / DISPONIBLES</th><th>CARGA / UMBRAL</th><th>COBERTURA Y BRECHAS</th><th>ESTADO</th></tr></thead><tbody>'+teamRows+'</tbody></table></div>':empty('Sin capacidad de equipos','Registrá equipos para analizar dotación y cobertura.')}
+ <p class="mini-glossary">Rojo: carga al umbral o cobertura inferior a 90%. Ámbar: carga dentro de 10 puntos del umbral o cobertura inferior a 95%.</p></section>`;
 }
 function assessmentsView(){
  const rows=state.assessments.map(a=>{
- const risk=state.risks.find(r=>r.assessmentId===a.id);
- return `<tr><td><span class="cell-title">${esc(a.domain)}</span><span class="cell-meta">${esc(getVertical(a.verticalId)?.name||'')}</span></td><td>${tag(a.score+'/5',Number(a.score)<=2?'red':Number(a.score)===3?'amber':'neutral')}</td>
- <td><span class="cell-title">${esc(a.finding)}</span><span class="cell-meta">Evidencia: ${esc(short(a.evidence)||'No indicada')}</span></td><td>${esc(a.owner)}<span class="cell-meta">${esc(a.date)}</span></td><td>${risk?tag('Riesgo vinculado',risk.status==='abierto'?'amber':'neutral'):Number(a.score)<=2?tag('Sin vinculación','red'):tag('Sin brecha crítica','neutral')}</td></tr>`;
+  const risk=state.risks.find(r=>r.assessmentId===a.id);
+  return `<tr><td><span class="cell-title">${esc(a.domain)}</span><span class="cell-meta">${esc(getVertical(a.verticalId)?.name||'')}</span></td><td>${semaphore(assessmentSignal(a))}<span class="cell-meta">Madurez ${a.score}/5</span></td>
+  <td><span class="cell-title">${esc(a.finding)}</span><span class="cell-meta">Evidencia: ${esc(short(a.evidence)||'Sin documento referenciado')}</span></td><td>${esc(a.owner)}<span class="cell-meta">${esc(a.date)}</span></td>
+  <td>${risk?semaphore(riskSignal(risk,state.actions,today())):a.score<=2?semaphore({level:'critical',label:'Crítico',reason:'No hay riesgo vinculado.'}):tag('Sin brecha de madurez','neutral')}</td></tr>`;
  }).join('');
- return `<section class="panel"><div class="panel-head"><div><h2>Assessments por dominio</h2><p>Calificación de madurez (1 a 5) con hallazgo, responsable y evidencia.</p></div>${mini('+ Nuevo assessment','assessment')}</div>
- ${rows?'<div class="table-wrap"><table class="data-table"><thead><tr><th>DOMINIO / VERTICAL</th><th>MADUREZ</th><th>HALLAZGO / EVIDENCIA</th><th>RESPONSABLE / FECHA</th><th>TRAZABILIDAD</th></tr></thead><tbody>'+rows+'</tbody></table></div>':empty('Sin evaluaciones','Registrá un assessment para comenzar a medir la madurez.')}
- <div class="modal-note">Regla automática demostrable: una puntuación de madurez de 1 o 2 crea un riesgo vinculado. Una evaluación de 3 a 5 queda registrada sin crear riesgos artificiales.</div></section>`;
+ const crit=state.assessments.filter(a=>assessmentSignal(a).level==='critical').length;
+ const without=state.assessments.filter(a=>!a.evidence).length;
+ return `<div class="executive-microline">
+  <div><span class="micro-label">ASSESSMENTS REGISTRADOS</span><strong>${state.assessments.length}</strong><small>Evaluaciones por dimensión de gobierno</small></div>
+  <div><span class="micro-label">MADUREZ CRÍTICA (1–2 / 5)</span><strong>${crit}</strong>${semaphore(crit?{level:'critical',label:'Crítico',reason:'Existe madurez baja.'}:{level:state.assessments.length?'ok':'unknown',label:state.assessments.length?'En control':'Sin evaluar',reason:'Estado de madurez'})}<small>Brechas que requieren evaluación</small></div>
+  <div><span class="micro-label">SIN EVIDENCIA REFERENCIADA</span><strong>${without}</strong><small>Las evidencias permiten sustentar evaluaciones</small></div></div>
+  <section class="panel"><div class="panel-head"><div><h2>Assessment de verticales y dominios</h2><p>Semáforo por madurez: 1–2 crítico; 3 atención; 4–5 en control. Resultado basado en evaluaciones registradas.</p></div>${mini('+ Nuevo assessment','assessment')}</div>
+  ${rows?'<div class="table-wrap"><table class="data-table"><thead><tr><th>DOMINIO / VERTICAL</th><th>ESTADO</th><th>HALLAZGO / EVIDENCIA</th><th>RESPONSABLE</th><th>RIESGO VINCULADO</th></tr></thead><tbody>'+rows+'</tbody></table></div>':empty('Sin evaluaciones','Registrá un assessment para comenzar la medición.')}
+  <div class="modal-note">La puntuación 1 o 2 crea automáticamente un riesgo con trazabilidad al assessment. El cierre requiere acciones y evidencia, no solo cambiar la calificación.</div></section>`;
 }
 function risksView(){
+ const ts=today();
  const rows=state.risks.map(r=>{
- const sev=severity(r),treat=riskTreatment(r,state.actions),actions=state.actions.filter(a=>a.riskId===r.id);
- const canValidate=r.status==='abierto'&&actions.length>0&&actions.every(a=>a.status==='completada');
- return `<tr><td><span class="cell-title">${esc(r.title)}</span><span class="cell-meta">${esc(short(r.description))}</span></td><td>${esc(getVertical(r.verticalId)?.name||'')}<span class="cell-meta">${esc(r.owner)}</span></td>
- <td>${tag(sev.label+' '+sev.score+'/25',sev.score>=15?'red':sev.score>=9?'amber':'neutral')}</td><td>${tag(treat,treat==='Sin plan'?'red':treat==='Con plan'?'amber':'neutral')}<span class="cell-meta">${actions.length} acción(es) asociadas</span></td>
- <td><div class="item-actions">${r.status==='abierto'?mini('Crear plan','action',r.id):''}${canValidate?mini('Validar mitigación','validate',r.id,'secondary'):''}</div></td></tr>`;
+  const sev=severity(r),treat=riskTreatment(r,state.actions),actions=state.actions.filter(a=>a.riskId===r.id);
+  const signal=riskSignal(r,state.actions,ts);
+  const canValidate=r.status==='abierto'&&actions.length>0&&actions.every(a=>a.status==='completada');
+  return `<tr><td><span class="cell-title">${esc(r.title)}</span><span class="cell-meta">${esc(short(r.description))}</span></td><td>${esc(getVertical(r.verticalId)?.name||'')}<span class="cell-meta">${esc(r.owner)}</span></td>
+   <td><span class="number">${sev.score}/25</span><span class="cell-meta">${sev.label} · P${r.probability} × I${r.impact}</span></td><td>${semaphore(signal)}<span class="cell-meta">${esc(treat)} · ${actions.length} acción(es)</span></td>
+   <td><div class="item-actions">${r.status==='abierto'?mini('Crear plan','action',r.id):''}${canValidate?mini('Validar mitigación','validate',r.id,'secondary'):''}</div></td></tr>`;
  }).join('');
- const s=dashboard(state,today());
+ const summary=executiveSummary(state,ts);
  return `<div class="grid-kpis">
- <article class="kpi"><div class="kpi-label">RIESGOS ABIERTOS</div><div class="kpi-value">${s.activeRisks}</div><div class="kpi-hint">Pendientes de evaluación y tratamiento</div></article>
- <article class="kpi danger"><div class="kpi-label">RIESGOS SIN PLAN</div><div class="kpi-value">${s.unmanaged}</div><div class="kpi-hint">Requieren una acción asignada</div></article>
- <article class="kpi warn"><div class="kpi-label">CRÍTICOS SIN PLAN</div><div class="kpi-value">${s.criticalUnmanaged}</div><div class="kpi-hint">Prioridad elevada</div></article>
- <article class="kpi"><div class="kpi-label">COBERTURA DE TRATAMIENTO</div><div class="kpi-value">${s.riskTreatmentPct===null?'—':num(s.riskTreatmentPct)+'%'}</div><div class="kpi-hint">Riesgos abiertos con al menos una acción</div></article></div>
- <section class="panel"><div class="panel-head"><div><h2>Mapa de exposición</h2><p>Probabilidad × impacto, tratamientos y acciones asociadas.</p></div>${mini('+ Registrar riesgo','risk')}</div>
- ${rows?'<div class="table-wrap"><table class="data-table"><thead><tr><th>RIESGO</th><th>VERTICAL / RESPONSABLE</th><th>EXPOSICIÓN</th><th>TRATAMIENTO</th><th>OPERAR</th></tr></thead><tbody>'+rows+'</tbody></table></div>':empty('Sin riesgos','Registrá un riesgo o generá uno automáticamente desde una evaluación.')}
- </section>`;
+  <article class="kpi"><div class="kpi-label">RIESGOS ABIERTOS</div><div class="kpi-value">${summary.activeRisks}</div><div class="kpi-hint">Tratamiento pendiente o en curso</div></article>
+  <article class="kpi danger"><div class="kpi-label">RIESGOS SIN PLAN</div><div class="kpi-value">${summary.unmanaged}</div><div class="kpi-hint">Sin medidas asignadas</div></article>
+  <article class="kpi warn"><div class="kpi-label">CRÍTICOS SIN PLAN</div><div class="kpi-value">${summary.criticalUnmanaged}</div><div class="kpi-hint">Exposición ≥15/25</div></article>
+  <article class="kpi"><div class="kpi-label">COBERTURA DE TRATAMIENTO</div><div class="kpi-value">${summary.riskTreatmentPct===null?'S/D':num(summary.riskTreatmentPct)+'%'}</div><div class="kpi-hint">Riesgos abiertos con al menos un plan</div></article></div>
+  <div class="layout-two executive-lower">
+   <section class="executive-panel"><div class="executive-panel-head"><div><span class="executive-overline">HEATMAP / EXPOSICIÓN</span><h3>Matriz 5 × 5 de riesgos abiertos</h3><p>Combinación de probabilidad e impacto según los riesgos registrados.</p></div></div>${heatmap(state.risks)}
+    <div class="heatmap-legend"><span><i class="legend-spot heatmap-ok"></i> Bajo / medio</span><span><i class="legend-spot heatmap-warning"></i> Alto</span><span><i class="legend-spot heatmap-critical"></i> Crítico</span></div></section>
+   <section class="executive-panel"><div class="executive-panel-head"><div><span class="executive-overline">RISK TREATMENT / CONTROL</span><h3>Tratamiento y decisiones</h3><p>Semáforo dinámico: considera estado del riesgo, existencia y vencimiento de planes.</p></div></div>
+   ${state.risks.length?state.risks.filter(r=>r.status==='abierto').slice(0,6).map(r=>signalLine(short(r.title),riskSignal(r,state.actions,ts),'Responsable: '+r.owner)).join(''):empty('Sin riesgos evaluados','Registrá un riesgo o assessment para disponer de tratamiento.')}
+   </section>
+  </div>
+  <section class="panel"><div class="panel-head"><div><h2>Registro y tratamiento</h2><p>La exposición y el estado de control se muestran por separado: un riesgo crítico con un plan aún requiere seguimiento.</p></div>${mini('+ Registrar riesgo','risk')}</div>
+  ${rows?'<div class="table-wrap"><table class="data-table"><thead><tr><th>RIESGO</th><th>VERTICAL / RESPONSABLE</th><th>EXPOSICIÓN</th><th>TRATAMIENTO</th><th>PRÓXIMA ACCIÓN</th></tr></thead><tbody>'+rows+'</tbody></table></div>':empty('Sin riesgos','Registrá un riesgo o generá uno desde un assessment.')}
+  </section>`;
 }
 function actionsView(){
+ const ts=today(),open=state.actions.filter(a=>a.status!=='completada');
+ const overdue=open.filter(a=>actionSignal(a,ts).level==='critical').length;
+ const dueSoon=open.filter(a=>actionSignal(a,ts).level==='warning').length;
  const rows=state.actions.map(a=>{
- const risk=getRisk(a.riskId);
- return `<tr><td><span class="cell-title">${esc(a.title)}</span><span class="cell-meta">Riesgo: ${esc(risk?.title||'Sin relación')}</span></td><td>${esc(a.owner)}</td><td>${esc(a.dueDate)}${actionOverdue(a,today())?'<span class="cell-meta text-danger">VENCIDA</span>':''}</td>
- <td>${tag(a.status==='completada'?'Completada':a.status==='en-curso'?'En curso':a.status==='bloqueada'?'Bloqueada':'Pendiente',a.status==='completada'?'neutral':actionOverdue(a,today())?'red':'amber')}</td>
- <td><div class="item-actions">${a.status!=='completada'?mini('Completar + evidencia','complete',a.id):tag('Evidencia registrada','neutral')}</div></td></tr>`;
+  const risk=getRisk(a.riskId),signal=actionSignal(a,ts);
+  return `<tr><td><span class="cell-title">${esc(a.title)}</span><span class="cell-meta">Riesgo: ${esc(risk?.title||'Sin relación')}</span></td><td>${esc(a.owner)}</td><td>${esc(a.dueDate)}${actionOverdue(a,ts)?'<span class="cell-meta text-danger">Vencida</span>':''}</td>
+  <td>${semaphore(signal)}<span class="cell-meta">${a.status==='completada'?'Completada':a.status==='en-curso'?'En curso':a.status==='bloqueada'?'Bloqueada':'Pendiente'}</span></td>
+  <td><div class="item-actions">${a.status!=='completada'?mini('Completar + evidencia','complete',a.id):tag('Evidencia registrada','neutral')}</div></td></tr>`;
  }).join('');
- return `<section class="panel"><div class="panel-head"><div><h2>Planes y compromisos</h2><p>Una acción se considera completada solo cuando se registra evidencia.</p></div>${mini('+ Crear plan','action')}</div>
- ${rows?'<div class="table-wrap"><table class="data-table"><thead><tr><th>ACCIÓN / RIESGO</th><th>RESPONSABLE</th><th>VENCIMIENTO</th><th>ESTADO</th><th>SEGUIMIENTO</th></tr></thead><tbody>'+rows+'</tbody></table></div>':empty('Sin planes','Primero registrá un riesgo abierto y asignale una acción correctiva.')}
- <div class="modal-note">Completar una acción no elimina automáticamente el riesgo: la mitigación requiere una validación independiente con evidencia y todas las acciones cerradas.</div></section>`;
+ return `<div class="executive-microline">
+  <div><span class="micro-label">ACCIONES ABIERTAS</span><strong>${open.length}</strong><small>Sin cierre respaldado por evidencia</small></div>
+  <div><span class="micro-label">VENCIDAS O BLOQUEADAS</span><strong>${overdue}</strong>${semaphore(overdue?{level:'critical',label:'Crítico',reason:'Plazos vencidos o bloqueados'}:{level:state.actions.length?'ok':'unknown',label:state.actions.length?'En control':'Sin evaluar',reason:'Sin vencidas'})}<small>Requieren intervención</small></div>
+  <div><span class="micro-label">PRÓXIMAS A VENCER</span><strong>${dueSoon}</strong><small>Plazos en siete días o menos</small></div></div>
+  <section class="panel"><div class="panel-head"><div><h2>Planes de acción y compromisos</h2><p>Seguimiento de ejecución. La evidencia de una acción no sustituye la validación final de mitigación.</p></div>${mini('+ Crear plan','action')}</div>
+  ${rows?'<div class="table-wrap"><table class="data-table"><thead><tr><th>ACCIÓN / RIESGO</th><th>RESPONSABLE</th><th>VENCIMIENTO</th><th>SEMÁFORO</th><th>EJECUCIÓN</th></tr></thead><tbody>'+rows+'</tbody></table></div>':empty('Sin planes','Primero registrá un riesgo abierto y asignale una acción.')}
+  <div class="modal-note">Rojo = vencida o bloqueada. Ámbar = vence en siete días o menos. Verde = dentro de plazo o completada con evidencia. Gris = información insuficiente.</div></section>`;
 }
 function continuityView(){
+ const ts=today(),critical=state.services.filter(s=>Number(s.criticality)===1);
+ const approved=critical.filter(s=>serviceSignal(s,ts).level==='ok').length;
+ const breaching=state.services.filter(s=>availability(s)!==null&&availability(s)<Number(s.targetPct)).length;
+ const noEvidence=critical.filter(s=>serviceSignal(s,ts).level==='unknown').length;
  const rows=state.services.map(s=>{
-  const a=availability(s),pass=a!==null&&a>=Number(s.targetPct),c=continuity(s);
+  const a=availability(s),pass=a!==null&&a>=Number(s.targetPct),signal=serviceSignal(s,ts);
+  const sla=a===null?{level:'unknown',label:'Sin evaluar',reason:'Sin minutos válidos'}:
+    pass?{level:'ok',label:'En control',reason:'Disponibilidad observada dentro del SLA'}:
+    {level:'critical',label:'Crítico',reason:'Disponibilidad inferior al SLA'};
   return `<tr><td><span class="cell-title">${esc(s.name)}</span><span class="cell-meta">${esc(getVertical(s.verticalId)?.name||'')} · Criticidad ${esc(s.criticality)}</span></td>
-  <td><span class="number ${pass?'text-good':'text-danger'}">${fmtPct(a)}</span><span class="cell-meta">Objetivo SLA: ${nfmt(s.targetPct)}%</span><span class="cell-meta">Período: ${nfmt(s.periodMinutes)} min</span></td>
-  <td>${nfmt(s.downtimeMinutes)} min<span class="cell-meta">Registrados en el período</span></td><td>RTO ${nfmt(s.rtoMin)} / RPO ${nfmt(s.rpoMin)} min</td>
-  <td>${tag(c.label,c.ok?'neutral':'amber')}<span class="cell-meta">Última prueba: ${esc(s.lastDRTest||'Sin registro')}</span></td><td>${mini('Actualizar','service',s.id)}</td></tr>`;
+  <td><span class="number">${fmtPct(a)}</span><span class="cell-meta">Objetivo: ${nfmt(s.targetPct)}% · período ${nfmt(s.periodMinutes)} min</span>${semaphore(sla)}</td>
+  <td><span class="number">${nfmt(s.downtimeMinutes)} min</span><span class="cell-meta">Interrupciones registradas</span></td>
+  <td>RTO ${nfmt(s.rtoMin)} min<span class="cell-meta">RPO ${nfmt(s.rpoMin)} min</span></td>
+  <td>${semaphore(signal)}<span class="cell-meta">${esc(s.lastDRTest||'Sin fecha de prueba')} · ${esc(s.drResult)}</span></td>
+  <td>${mini('Actualizar','service',s.id)}</td></tr>`;
  }).join('');
- return `<section class="panel"><div class="panel-head"><div><h2>Disponibilidad registrada y preparación de DR</h2><p>Disponibilidad calculada por servicio (minutos del período vs. minutos de caída) y resultado de pruebas.</p></div>${mini('+ Agregar servicio','service')}</div>
- ${rows?'<div class="table-wrap"><table class="data-table"><thead><tr><th>SERVICIO</th><th>DISPONIBILIDAD / SLA</th><th>INDISPONIBILIDAD</th><th>OBJETIVOS</th><th>CONTINUIDAD</th><th>OPERAR</th></tr></thead><tbody>'+rows+'</tbody></table></div>':empty('Sin servicios','Registrá servicios y mediciones para calcular disponibilidad.')}
- <div class="modal-note">Los datos de demostración son ficticios. Disponibilidad = (minutos del período − minutos de caída) / minutos del período. La aprobación DR se registra por separado: una buena disponibilidad no equivale a continuidad probada.</div></section>`;
+ const all=state.services.map(availability).filter(x=>x!==null);
+ const mean=all.length?all.reduce((x,y)=>x+y,0)/all.length:null;
+ return `<div class="executive-microline">
+  <div><span class="micro-label">DISPONIBILIDAD MEDIA REGISTRADA</span><strong>${fmtPct(mean)}</strong><small>Promedio simple entre servicios; sin ponderación por criticidad</small></div>
+  <div><span class="micro-label">SLA INCUMPLIDOS</span><strong>${breaching}</strong>${semaphore(breaching?{level:'critical',label:'Crítico',reason:'Objetivos SLA excedidos'}:{level:all.length?'ok':'unknown',label:all.length?'En control':'Sin evaluar',reason:'Cumplimiento de SLA'})}<small>Disponibilidad medida menor a objetivo</small></div>
+  <div><span class="micro-label">DR CRÍTICO VIGENTE / TOTAL</span><strong>${critical.length?approved+'/'+critical.length:'S/D'}</strong><small>${noEvidence} crítico(s) sin evaluación DR · Vigencia ilustrativa de 180 días</small></div>
+ </div>
+ <section class="panel"><div class="panel-head"><div><h2>Servicios críticos, disponibilidad y DRP</h2><p>Dos mediciones independientes: disponibilidad durante un período y capacidad de recuperación validada. El semáforo DRP no supone cumplimiento real del RTO/RPO.</p></div>${mini('+ Agregar servicio','service')}</div>
+  ${rows?'<div class="table-wrap"><table class="data-table"><thead><tr><th>SERVICIO</th><th>DISPONIBILIDAD Y SLA</th><th>CAÍDA REGISTRADA</th><th>RTO / RPO OBJETIVO</th><th>CONTINUIDAD / DRP</th><th>ACTUALIZAR</th></tr></thead><tbody>'+rows+'</tbody></table></div>':empty('Sin servicios','Registrá servicios para evaluar SLA y continuidad.')}
+  <div class="modal-note">Rojo si SLA incumplido o DR fallido; ámbar si prueba parcial o si una prueba aprobada supera 180 días; verde si ambas dimensiones están dentro de sus supuestos; gris si no hay evidencia suficiente. Los 180 días son una política ilustrativa, no una certificación de continuidad.</div></section>`;
 }
 function committeeView(){
- const rows=state.decisions.map(d=>{
- const risk=getRisk(d.riskId);
- return `<tr><td><span class="cell-title">${esc(d.title)}</span><span class="cell-meta">${risk?'Riesgo: '+esc(risk.title):'Decisión general'}</span></td><td>${esc(d.owner)}</td><td>${esc(d.dueDate)}</td>
- <td>${tag(d.status==='resuelta'?'Resuelta':'Pendiente',d.status==='resuelta'?'neutral':'amber')}</td><td>${d.status==='pendiente'?mini('Registrar resolución','decision-close',d.id):tag('Con evidencia','neutral')}</td></tr>`;
- }).join('');
- return `<section class="panel"><div class="panel-head"><div><h2>Decisiones del Comité de Tecnología</h2><p>Compromisos ejecutivos con responsable, plazo, riesgo asociado y evidencia de resolución.</p></div>${mini('+ Nueva decisión','decision')}</div>
- ${rows?'<div class="table-wrap"><table class="data-table"><thead><tr><th>DECISIÓN</th><th>RESPONSABLE</th><th>FECHA OBJETIVO</th><th>ESTADO</th><th>SEGUIMIENTO</th></tr></thead><tbody>'+rows+'</tbody></table></div>':empty('Sin decisiones','Registrá un compromiso para llevar seguimiento de comité.')}
- </section>`;
+ const ts=today();
+ const pending=state.decisions.filter(d=>d.status==='pendiente');
+ const resolved=state.decisions.filter(d=>d.status==='resuelta');
+ const getSignal=d=>actionSignal({...d,status:d.status==='resuelta'?'completada':'pendiente'},ts);
+ const card=d=>{
+  const risk=getRisk(d.riskId);
+  return `<div class="board-decision"><div class="board-decision-title">${esc(d.title)}</div><div>${semaphore(getSignal(d))}</div>
+   <div class="cell-meta">${risk?'Riesgo: '+esc(risk.title):'Decisión sin riesgo asociado'}</div>
+   <div class="board-decision-foot"><span>${esc(d.owner)} · ${esc(d.dueDate)}</span>${d.status==='pendiente'?mini('Registrar resolución','decision-close',d.id):tag('Evidencia registrada','neutral')}</div></div>`;
+ };
+ const overdue=pending.filter(d=>getSignal(d).level==='critical').length;
+ return `<div class="executive-summary signal-border-${overdue?'critical':pending.length?'warning':'ok'}">
+  <div class="executive-summary-upper">
+   <div><span class="executive-overline">TECHNOLOGY STEERING COMMITTEE / BOARD EDITION</span><h2>Decisiones con responsables y resultados</h2>
+   <p class="executive-summary-text">${pending.length?pending.length+' compromiso(s) pendiente(s), de los cuales '+overdue+' están vencidos. Priorizar los bloqueos y decisiones con exposición en servicios críticos.':'No hay compromisos pendientes registrados. Revisar la vigencia de riesgos y acuerdos antes del siguiente comité.'}</p>
+   <div class="summary-footnotes"><span>Registro local de compromisos</span><span>Las resoluciones requieren evidencia</span></div></div>
+   <div class="summary-aside"><div class="summary-aside-header">DECISIONES ABIERTAS</div><div class="summary-aside-value">${pending.length}</div><span>Compromisos por resolver</span></div>
+  </div></div>
+  <div class="section-eyeline">01 / AGENDA Y RESOLUCIONES DE COMITÉ</div>
+  <div class="board-columns">
+    <section class="board-column"><div class="board-column-head">PENDIENTES <span class="board-count">${pending.length}</span></div>${pending.length?pending.map(card).join(''):empty('Sin decisiones pendientes','No hay compromisos abiertos registrados.')}</section>
+    <section class="board-column"><div class="board-column-head">RESUELTAS <span class="board-count">${resolved.length}</span></div>${resolved.length?resolved.map(card).join(''):empty('Sin cierres registrados','Las resoluciones con evidencia aparecen aquí.')}</section>
+  </div>
+  <div class="section-eyeline">02 / ADMINISTRACIÓN DE COMPROMISOS</div>
+  <section class="panel"><div class="panel-head"><div><h2>Agenda ejecutiva y seguimiento</h2><p>Registrá acuerdos con responsable, vencimiento, riesgo relacionado y constancia de resolución.</p></div>${mini('+ Nueva decisión','decision')}</div>
+   ${state.decisions.length?'<div class="table-wrap"><table class="data-table"><thead><tr><th>DECISIÓN</th><th>RESPONSABLE</th><th>PLAZO</th><th>ESTADO</th><th>GESTIÓN</th></tr></thead><tbody>'+
+    state.decisions.map(d=>`<tr><td><span class="cell-title">${esc(d.title)}</span><span class="cell-meta">${getRisk(d.riskId)?'Riesgo: '+esc(getRisk(d.riskId).title):'Decisión general'}</span></td><td>${esc(d.owner)}</td><td>${esc(d.dueDate)}</td><td>${semaphore(getSignal(d))}</td><td>${d.status==='pendiente'?mini('Registrar resolución','decision-close',d.id):tag('Con evidencia','neutral')}</td></tr>`).join('')+'</tbody></table></div>':empty('Sin decisiones','Registrá un compromiso para iniciar el seguimiento.')}
+  </section>`;
 }
 function render(){
  const meta=viewMeta[view]||viewMeta.overview;

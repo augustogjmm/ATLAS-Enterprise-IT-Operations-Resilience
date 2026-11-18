@@ -26,6 +26,8 @@ jobs:
           test -f dist/governance.js
           test -f dist/governance.css
           test -f dist/lib/governance/core.js
+          test -f dist/lib/governance/insights.js
+          test -f dist/executive.css
           test -f dist/simulador.html
           test -f dist/app.js
           test -f dist/lib/data.js

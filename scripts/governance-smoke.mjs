@@ -27,7 +27,16 @@ try{
  await page.goto(url,{waitUntil:'networkidle'});
  assert.match(await page.title(),/Gobierno/);
  assert.match(await page.locator('h1').innerText(),/Gobernar la operación/i);
- assert.equal((await page.locator('.kpi-value').allInnerTexts())[0],'1');
+ assert.equal(await page.locator('link[href="./executive.css"]').count(),1);
+ assert.ok(await page.locator('.executive-summary').isVisible());
+ assert.equal(await page.locator('.executive-kpi').count(),4);
+ assert.equal(await page.locator('.heatmap-cell').count(),25);
+ assert.equal(await page.locator('.executive-data-table tbody tr').count(),4);
+ assert.ok(await page.locator('.signal-chip.signal-critical').count()>0);
+ assert.ok(await page.getByText('Semáforo por vertical').isVisible());
+ const executiveSkin=await page.locator('.page-frame').evaluate(el=>getComputedStyle(el).backgroundColor);
+ assert.ok(executiveSkin!=='rgb(0, 0, 0)');
+ assert.equal((await page.locator('.executive-kpi strong').allInnerTexts())[0],'1');
  assert.ok(await page.getByText('De la brecha a la acción').isVisible());
  await page.screenshot({path:resolve(artifacts,'atlas-governance-desktop.png'),fullPage:true});
 
@@ -46,6 +55,7 @@ try{
  const riskRow=page.locator('tr').filter({hasText:'Brecha de Seguridad'});
  assert.equal(await riskRow.count(),1);
  assert.ok((await riskRow.innerText()).includes('Sin plan'));
+ assert.ok(await riskRow.locator('.signal-chip.signal-warning').count()>0); // Riesgo 3×4 = 12, nivel alto (no crítico)
 
  // Riesgo -> plan con responsable y plazo
  await riskRow.getByRole('button',{name:'Crear plan'}).click();
@@ -55,6 +65,7 @@ try{
  await page.locator('#dialog-submit').click();
  const nowPlanned=page.locator('tr').filter({hasText:'Brecha de Seguridad'});
  assert.ok((await nowPlanned.innerText()).includes('Con plan'));
+ assert.ok(await nowPlanned.locator('.signal-chip.signal-warning').count()>0);
 
  // Plan -> cierre con evidencia
  await page.locator('button[data-view="actions"]').click();
@@ -70,6 +81,7 @@ try{
  await page.locator('[name="evidence"]').fill('Validación ejecutiva del plan y del resultado de continuidad');
  await page.locator('#dialog-submit').click();
  assert.ok((await page.locator('tr').filter({hasText:'Brecha de Seguridad'}).innerText()).includes('Mitigación validada'));
+ assert.ok(await page.locator('tr').filter({hasText:'Brecha de Seguridad'}).locator('.signal-chip.signal-ok').count()>0);
 
  // Capacity -> riesgo generado
  await page.locator('button[data-view="capacity"]').click();
@@ -103,12 +115,13 @@ try{
  await page.locator('[name="lastDRTest"]').fill('2026-11-18');
  await page.locator('[name="drEvidence"]').fill('Ensayo ficticio registrado para E2E');
  await page.locator('#dialog-submit').click();
- assert.ok((await page.locator('tr').filter({hasText:'Conectividad entre sitios'}).innerText()).includes('Prueba aprobada'));
+ assert.ok((await page.locator('tr').filter({hasText:'Conectividad entre sitios'}).innerText()).includes('Prueba aprobada') || await page.locator('tr').filter({hasText:'Conectividad entre sitios'}).locator('.signal-chip.signal-ok').count()>0);
 
  const mobile=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
  mobile.on('pageerror',error=>errors.push('mobile: '+error.message));
  await mobile.goto(url,{waitUntil:'networkidle'});
- assert.equal((await mobile.locator('.kpi-value').allInnerTexts())[0],'1');
+ assert.equal((await mobile.locator('.executive-kpi strong').allInnerTexts())[0],'1');
+ assert.equal(await mobile.locator('.heatmap-cell').count(),25);
  await mobile.locator('button[data-view="capacity"]').click();
  const overflow=await mobile.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);
  assert.ok(overflow<=1,'Desbordamiento horizontal en móvil: '+overflow);
