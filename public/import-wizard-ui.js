@@ -18,7 +18,7 @@ export function importWizardView(draft,state,{esc}){
   const current=(draft.priorities&&draft.priorities[raw]!==undefined)?draft.priorities[raw]:defaultPriority[raw];
   return '<label class="mapping-row"><span class="mapping-raw">'+quote(raw)+'</span>'+select('priority_'+i,[['','— Interpretación pendiente —'],...['P1','P2','P3','P4'].map(p=>[p,p])],current)+'</label>';
  }).join('');
- const header=<div class="mapping-wizard-top"><div><span class="executive-overline">IMPORTACIÓN CONTROLADA / PASO 1 DE 2</span><h4>Validar el mapeo del CSV</h4><p>Detectamos '+draft.rows.length+' fila(s). Confirmá columnas, servicios, prioridades y el tratamiento de fechas antes de incorporar los registros.</p></div><button type="button" class="mini-button secondary" data-command="cancel-incident-import">Cancelar</button></div>;
+ const header='<div class="mapping-wizard-top"><div><span class="executive-overline">IMPORTACIÓN CONTROLADA / PASO 1 DE 2</span><h4>Validar el mapeo del CSV</h4><p>Detectamos '+draft.rows.length+' fila(s). Confirmá columnas, servicios, prioridades y el tratamiento de fechas antes de incorporar los registros.</p></div><button type="button" class="mini-button secondary" data-command="cancel-incident-import">Cancelar</button></div>';
  const mappingFields=IMPORT_FIELDS.map(field=>'<label class="mapping-field"><span>'+quote(field.label)+(field.required?' *':' (opcional)')+'</span>'+select('col_'+field.key,options,columns[field.key]??'')+'</label>').join('');
  const formatOptions=[['iso','ISO: AAAA-MM-DD HH:mm o formato ISO con zona'],['dmy','Local: DD/MM/AAAA HH:mm']];
  const selectedFormat=draft.format||'iso';
