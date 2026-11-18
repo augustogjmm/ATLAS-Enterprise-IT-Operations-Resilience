@@ -27,15 +27,19 @@ jobs:
           test -f dist/governance.css
           test -f dist/lib/governance/core.js
           test -f dist/lib/governance/insights.js
+          test -f dist/lib/governance/performance.js
+          test -f dist/performance-ui.js
+          test -f dist/performance.css
           test -f dist/executive.css
           test -f dist/simulador.html
           test -f dist/app.js
           test -f dist/lib/data.js
           test -f dist/lib/engine.js
-      - name: Instalar navegador para pruebas funcionales
+      - name: Usar Chrome preinstalado para pruebas de navegador
         run: |
           npm install --no-save playwright@1.55.0
-          npx playwright install --with-deps chromium
+          command -v google-chrome
+          google-chrome --version
       - name: Probar interfaz, escenarios y exportación en Chromium
         run: node scripts/browser-smoke.mjs
       - name: Probar gobierno, riesgos, planes y persistencia en Chromium
