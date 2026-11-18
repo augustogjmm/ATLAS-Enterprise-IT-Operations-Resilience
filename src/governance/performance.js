@@ -52,10 +52,10 @@ export function metricValue(state,key,today){
   const base=dashboard(state,today);
   const measured=state.services.map(s=>({service:s,value:availability(s)})).filter(x=>x.value!==null);
   switch(key){
-    case 'critical_unmanaged':return base.criticalUnmanaged;
-    case 'overdue_actions':return base.overdue;
+    case 'critical_unmanaged':return state.risks.length?base.criticalUnmanaged:null;
+    case 'overdue_actions':return state.actions.length?base.overdue:null;
     case 'risk_coverage':return base.riskTreatmentPct;
-    case 'capacity_alerts':return base.capacityAlerts+base.teamAlerts;
+    case 'capacity_alerts':return state.capacities.length+state.teamCapacities.length?base.capacityAlerts+base.teamAlerts:null;
     case 'dr_verified':{
       const critical=state.services.filter(s=>Number(s.criticality)===1);
       return critical.length?100*critical.filter(s=>serviceSignal(s,today).level==='ok').length/critical.length:null;
@@ -64,7 +64,7 @@ export function metricValue(state,key,today){
     case 'availability_mean':return measured.length?measured.reduce((a,b)=>a+b.value,0)/measured.length:null;
     case 'assessment_maturity':return base.averageAssessment;
     case 'team_coverage':return state.teamCapacities.length?state.teamCapacities.reduce((n,t)=>n+Number(t.coveragePct),0)/state.teamCapacities.length:null;
-    case 'decisions_overdue':return state.decisions.filter(d=>d.status==='pendiente'&&d.dueDate<today).length;
+    case 'decisions_overdue':return state.decisions.length?state.decisions.filter(d=>d.status==='pendiente'&&d.dueDate<today).length:null;
     default:throw new Error('Métrica no admitida.');
   }
 }
