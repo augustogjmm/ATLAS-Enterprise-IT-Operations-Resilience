@@ -23,6 +23,10 @@ jobs:
       - name: Verificación de archivos generados
         run: |
           test -f dist/index.html
+          test -f dist/governance.js
+          test -f dist/governance.css
+          test -f dist/lib/governance/core.js
+          test -f dist/simulador.html
           test -f dist/app.js
           test -f dist/lib/data.js
           test -f dist/lib/engine.js
@@ -32,6 +36,8 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Probar interfaz, escenarios y exportación en Chromium
         run: node scripts/browser-smoke.mjs
+      - name: Probar gobierno, riesgos, planes y persistencia en Chromium
+        run: node scripts/governance-smoke.mjs
       - name: Guardar capturas de pantalla de revisión
         if: always()
         uses: actions/upload-artifact@v4
