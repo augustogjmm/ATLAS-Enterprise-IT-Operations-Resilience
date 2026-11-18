@@ -116,6 +116,8 @@ Referencias oficiales:
 - «Volver a V4 local» recupera el snapshot local preexistente, sin escribir en D1 ni borrar archivos `localStorage`.
 - «Crear workspace» admite comenzar vacío. La copia de registros locales requiere dos confirmaciones explícitas para evitar transmisión accidental de datos.
 
+**Cupo de crecimiento:** el backend admite como máximo **10 workspaces por organización**. El control está incluido de forma atómica en el `INSERT` SQL y devuelve HTTP 429 si el cupo se agotó, sin añadir entradas espurias al historial ni a la auditoría. Es un límite intencional de la demostración, no una capacidad máxima de Cloudflare. No elimina workspaces existentes ni datos de V4.
+
 **Costo incremental de historial:** cada versión retenida ocupa almacenamiento D1, por lo que la retención automática de cinco versiones limita crecimiento, pero NO garantiza que las cuotas gratuitas sean suficientes para cualquier número de workspaces. Antes de desplegar, definir máximo de organizaciones/workspaces y alertas de capacidad; medir filas leídas/escritas y tamaño real de la base.
 
 **Límites de esta etapa:** no hay sincronización en vivo, resolución automática de conflictos, aprobaciones multiusuario por flujo, firma inmutable de actas ni pruebas contra Cloudflare Access/D1 reales. Los metadatos de auditoría se escriben en D1 solo después de instalarlo y provisionarlo. Las pruebas de navegador utilizan una API simulada con respuestas controladas. Incluyen restauración de revisiones en Chromium. En CI se valida además la migración SQL con SQLite nativo, la retención de cinco versiones, restauración con control de concurrencia y la denegación entre organizaciones.
