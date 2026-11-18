@@ -48,6 +48,9 @@ export const SCENARIOS = Object.freeze([
   { id: 'dual-network', label: 'Multi-site network partition', category: 'Correlated failure',
     description: 'Both network cores are unavailable; redundant compute cannot prevent service loss.',
     failed: ['network-a', 'network-b'], manualRecovery: 150, dataLoss: 0 },
+  { id: 'data-loss', label: 'Primary database loss · delayed replication', category: 'Data integrity',
+    description: 'Primary database fails while the secondary route is still available; estimated 9-minute replication lag breaches strict RPOs.',
+    failed: ['data-a'], manualRecovery: 130, dataLoss: 9 },
   { id: 'replica-lag', label: 'Replica unavailable · DR risk', category: 'Recovery readiness',
     description: 'The primary route is operational, but the secondary database cannot serve recovery.',
     failed: ['data-b'], manualRecovery: 120, dataLoss: 35 }
