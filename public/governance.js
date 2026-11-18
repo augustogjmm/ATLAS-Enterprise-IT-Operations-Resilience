@@ -10,6 +10,7 @@ import {ensureIncidentState,seedDemoIncidents,validateIncidentState,parseInciden
 import {incidentsView as renderIncidentsView} from './incidents-ui.js';
 import {inspectIncidentCSV,suggestColumnMapping,suggestServiceMap,suggestPriorityMap,uniqueMappedValues,parseMappedIncidentCSV} from './lib/governance/import-mapping.js';
 import {importWizardView} from './import-wizard-ui.js';
+import {mountRemoteV5} from './v5-ui.js';
 
 const STORAGE_KEY='atlas-governance-workspace-v1';
 const today=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')};
@@ -71,11 +72,19 @@ function load(){
  } catch(err){storageOK=false;return seedDemoIncidents(seedDemoPerformance(createDemo()));}
 }
 let state=load();
+const v5=mountRemoteV5({
+ getState:()=>structuredClone(state),
+ getLocal:()=>load(),
+ replaceState:data=>{closeForm();state=upgrade(data);importDraft=null;render();},
+ validateState:data=>upgrade(structuredClone(data)),
+ notice:(message,error=false)=>notice(message,error)
+});
 function save(message){
   state.kind=state.kind==='demo'?'custom':state.kind;
   assertValidState(state);
   validatePerformanceState(state);
   validateIncidentState(state);
+  if(v5.active()){void v5.persist(state,message);render();return;}
   let persisted=false;
   try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));storageOK=true;persisted=true;}
   catch(err){storageOK=false;notice('No se pudo guardar. Exportá un respaldo; el navegador bloqueó el almacenamiento.',true)}
@@ -346,6 +355,7 @@ function render(){
  $('view-root').innerHTML=(pages[view]||overview)();
  for(const node of document.querySelectorAll('[data-view]'))node.classList.toggle('selected',node.dataset.view===view);
  if(view==='incidents'&&importDraft)drawImportWizard();
+ v5.render();
 }
 
 function drawImportWizard(){
@@ -378,6 +388,7 @@ const drOptions=[['sin-evaluar','Sin evaluar'],['aprobado','Prueba aprobada'],['
 
 function openForm(type,id=''){
  if(type.startsWith('view:')){switchView(type.slice(5));return;}
+ if(!v5.permitted())return;
  if(type==='seed-performance'){
   if(state.kpis.length||state.objectives.length||state.keyResults.length)return notice('Ya hay indicadores o objetivos; los ejemplos no sobrescribirán registros.',true);
   if(!confirm('¿Agregar KPI y OKR de ejemplo sin modificar tus riesgos, servicios ni acciones? Las líneas base son ilustrativas.'))return;
@@ -473,6 +484,7 @@ document.addEventListener('click',e=>{
    importDraft=null;render();notice('Importación cancelada. No se modificaron los datos.');return;
  }
  if(cmd.dataset.command==='apply-incident-import'){
+   if(!v5.permitted())return;
    try{
     const config=mappingSelections();
     const rows=parseMappedIncidentCSV(importDraft.text,state,config);
@@ -499,15 +511,15 @@ document.addEventListener('click',e=>{
   const a=document.createElement('a');a.href=objectUrl;a.download='atlas-governance-respaldo-'+today()+'.json';document.body.append(a);a.click();a.remove();
   setTimeout(()=>URL.revokeObjectURL(objectUrl),1500);notice('Respaldo JSON descargado.');
  }
- if(cmd.dataset.command==='demo'&&confirm('¿Reemplazar los datos locales actuales por la demostración ficticia? Exportá un respaldo si querés conservarlos.')){
+ if(cmd.dataset.command==='demo'&&!v5.active()&&confirm('¿Reemplazar los datos locales actuales por la demostración ficticia? Exportá un respaldo si querés conservarlos.')){
   state=seedDemoIncidents(seedDemoPerformance(createDemo()));save('Demostración restaurada.');state.kind='demo';localStorage.setItem(STORAGE_KEY,JSON.stringify(state));render();
  }
- if(cmd.dataset.command==='empty'&&confirm('¿Vaciar todos los registros locales? Esta acción no se puede deshacer sin un respaldo exportado.')){
+ if(cmd.dataset.command==='empty'&&!v5.active()&&confirm('¿Vaciar todos los registros locales? Esta acción no se puede deshacer sin un respaldo exportado.')){
   state=ensureIncidentState(ensurePerformanceState(makeEmpty()));save('Espacio local vacío preparado.');switchView('verticals');
  }
 });
 $('record-form').addEventListener('submit',e=>{
- e.preventDefault();if(!modal)return;
+ e.preventDefault();if(!modal||!v5.permitted())return;
  const data=Object.fromEntries(new FormData(e.currentTarget).entries());
  try{submitRecord(data);closeForm();save('Registro guardado y tablero actualizado.')}catch(err){notice(err.message||'No se pudo registrar.',true)}
 });
@@ -538,6 +550,7 @@ document.addEventListener('change',async event=>{
    return;
  }
  if(event.target?.id!=='incident-file')return;
+ if(!v5.permitted())return;
  const picker=event.target,file=picker.files?.[0];picker.value='';
  if(!file)return;
  if(file.size>512*1024)return notice('El CSV supera 512 KB. Dividilo en lotes más pequeños.',true);
@@ -555,12 +568,13 @@ $('import-file').addEventListener('change',async e=>{
  if(file.size>1024*1024)return notice('El archivo supera 1 MB.',true);
  try{
   const data=upgrade(JSON.parse(await file.text()));
-  if(!confirm('¿Reemplazar todos los registros locales por este respaldo?'))return;
+  if(!v5.permitted())return;
+  if(!confirm(v5.active()?'¿Reemplazar el workspace REMOTO con este respaldo? Se auditará como nueva revisión.':'¿Reemplazar todos los registros locales por este respaldo?'))return;
   state=data;state.kind='custom';save('Respaldo importado.');switchView('overview');
  }catch(err){notice('No se importó: '+(err.message||'JSON inválido'),true)}
 });
 window.addEventListener('storage',e=>{
- if(e.key!==STORAGE_KEY)return;
+ if(e.key!==STORAGE_KEY||v5.active())return;
  try{state=e.newValue?upgrade(JSON.parse(e.newValue)):seedDemoIncidents(seedDemoPerformance(createDemo()));render();notice('Los registros fueron actualizados desde otra pestaña.')}catch{notice('No se pudo sincronizar esta pestaña.',true)}
 });
 render();
