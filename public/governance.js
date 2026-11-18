@@ -3,6 +3,7 @@ import {
   actionOverdue, capacityStatus, availability, continuity, registerAssessment,
   registerCapacity, teamStatus, registerTeamCapacity, registerAction, completeAction, validateRisk, addEvent
 } from './lib/governance/core.js';
+import {worstSignal, riskSignal, actionSignal, infrastructureSignal, workforceSignal, assessmentSignal, serviceSignal, verticalSignal, executiveSummary, riskMatrix} from './lib/governance/insights.js';
 
 const STORAGE_KEY='atlas-governance-workspace-v1';
 const today=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')};
@@ -14,6 +15,11 @@ const nfmt=v=>new Intl.NumberFormat('es-AR',{maximumFractionDigits:2}).format(Nu
 const short=v=>v&&v.length>75?v.slice(0,72)+'…':v;
 const empty=(title='Sin registros',body='Podés cargar información desde el botón superior.')=>'<div class="empty-state"><strong>'+esc(title)+'</strong>'+esc(body)+'</div>';
 const tag=(text,tone='neutral')=>'<span class="tag '+tone+'">'+esc(text)+'</span>';
+const semaphore=signal=>'<span class="signal-chip signal-'+signal.level+'" title="'+esc(signal.reason)+'"><i aria-hidden="true"></i>'+esc(signal.label)+'</span>';
+const signalLine=(name,signal,detail='',navigate='')=>'<div class="signal-line"><div class="signal-line-label"><span>'+esc(name)+'</span><small>'+esc(detail)+'</small></div>'+semaphore(signal)+(navigate?'<button class="signal-arrow" type="button" data-open="view:'+esc(navigate)+'" aria-label="Ver '+esc(name)+'">↗</button>':'')+'</div>';
+const indicator=(label,value,description,signal)=>'<article class="executive-kpi signal-border-'+signal.level+'"><div class="executive-kpi-head"><span>'+esc(label)+'</span>'+semaphore(signal)+'</div><strong>'+esc(value)+'</strong><p>'+esc(description)+'</p></article>';
+const percentBar=(percent,signal,limit)=>'<div class="capacity-track" role="img" aria-label="Utilización '+nfmt(percent)+' por ciento; umbral '+nfmt(limit)+' por ciento"><span class="capacity-fill capacity-'+signal.level+'" style="width:'+Math.max(0,Math.min(100,percent||0))+'%"></span><i class="capacity-threshold" style="left:'+Math.max(0,Math.min(100,limit||0))+'%" aria-hidden="true"></i></div>';
+const heatmap=(risks)=>'<div class="heatmap-frame"><div class="heatmap-y-label">PROBABILIDAD ↑</div><div class="heatmap-container"><div class="heatmap-grid">'+riskMatrix(risks).flat().map(c=>'<button type="button" data-open="view:risks" class="heatmap-cell heatmap-'+c.level+(c.count?' populated':'')+'" aria-label="Probabilidad '+c.probability+', impacto '+c.impact+': '+c.count+' riesgos abiertos" title="P '+c.probability+' × I '+c.impact+' = '+c.score+'/25 · '+c.count+' riesgos">'+(c.count?'<b>'+c.count+'</b>':'<small>·</small>')+'</button>').join('')+'</div><div class="heatmap-x-label">IMPACTO →</div></div></div>';
 const mini=(label,open,id='',style='')=>'<button class="mini-button '+style+'" type="button" data-open="'+esc(open)+'" data-id="'+esc(id)+'">'+esc(label)+'</button>';
 const getVertical=id=>state.verticals.find(v=>v.id===id);
 const getRisk=id=>state.risks.find(r=>r.id===id);
@@ -53,42 +59,83 @@ function save(message){
 }
 function notice(message,error=false){const el=$('toast');el.textContent=message;el.className='toast show'+(error?' error':'');clearTimeout(toastTimeout);toastTimeout=setTimeout(()=>el.className='toast',4300)}
 function overview(){
- const s=dashboard(state,today());
- const risky=state.risks.filter(r=>r.status==='abierto').sort((a,b)=>severity(b).score-severity(a).score);
- const alerts=risky.filter(r=>!state.actions.some(a=>a.riskId===r.id)).slice(0,5);
- const due=state.actions.filter(a=>a.status!=='completada').sort((a,b)=>a.dueDate.localeCompare(b.dueDate)).slice(0,5);
- const dr=state.services.filter(s=>Number(s.criticality)===1&&!continuity(s).ok);
- const cap=state.capacities.filter(c=>capacityStatus(c).warning);
- const teams=state.teamCapacities.filter(c=>teamStatus(c).warning);
- return `<div class="grid-kpis">
-   <article class="kpi danger"><div class="kpi-label">RIESGOS CRÍTICOS SIN PLAN</div><div class="kpi-value">${s.criticalUnmanaged}</div><div class="kpi-hint">${s.unmanaged} riesgos abiertos sin tratamiento de ${s.activeRisks} activos</div></article>
-   <article class="kpi warn"><div class="kpi-label">ACCIONES VENCIDAS</div><div class="kpi-value">${s.overdue}</div><div class="kpi-hint">Plazos superados, sin evidencia de cierre</div></article>
-   <article class="kpi warn"><div class="kpi-label">SERVICIOS CRÍTICOS / DR NO VALIDADO</div><div class="kpi-value">${s.drGaps}</div><div class="kpi-hint">Prueba parcial, fallida o no evaluada</div></article>
-   <article class="kpi"><div class="kpi-label">ALERTAS DE CAPACIDAD</div><div class="kpi-value">${s.capacityAlerts+s.teamAlerts}</div><div class="kpi-hint">Recursos: ${s.capacityAlerts} · Equipos: ${s.teamAlerts}</div></article>
+ const ts=today(), x=executiveSummary(state,ts);
+ const untreated=state.risks.filter(r=>r.status==='abierto'&&riskSignal(r,state.actions,ts).level==='critical')
+   .sort((a,b)=>severity(b).score-severity(a).score).slice(0,4);
+ const due=state.actions.filter(a=>a.status!=='completada')
+   .sort((a,b)=>a.dueDate.localeCompare(b.dueDate)).slice(0,4);
+ const dimension=[
+  ['Riesgos',worstSignal(state.risks.filter(r=>r.status==='abierto').map(r=>riskSignal(r,state.actions,ts))),x.activeRisks+' abiertos','risks'],
+  ['Capacity',worstSignal([...state.capacities.map(infrastructureSignal),...state.teamCapacities.map(workforceSignal)]),x.capacityAlerts+x.teamAlerts+' alertas','capacity'],
+  ['Continuidad',worstSignal(state.services.filter(s=>Number(s.criticality)===1).map(s=>serviceSignal(s,ts))),x.criticalServices+' servicios críticos','continuity'],
+  ['Ejecución',worstSignal(state.actions.filter(a=>a.status!=='completada').map(a=>actionSignal(a,ts))),x.overdue+' vencidas','actions'],
+  ['Assessments',worstSignal(state.assessments.map(assessmentSignal)),x.lowAssessments+' brechas','assessments']
+ ];
+ const financeSignal=x.pendingDecisions?{level:'warning',label:'Atención',reason:'Existen decisiones abiertas para comité.'}:{level:state.decisions.length?'ok':'unknown',label:state.decisions.length?'En control':'Sin evaluar',reason:'Sin decisiones pendientes registradas.'};
+ const riskCritical=x.criticalUnmanaged?{level:'critical',label:'Crítico',reason:'Hay riesgos críticos sin tratamiento'}:{level:x.unmanaged?'warning':x.activeRisks?'ok':'unknown',label:x.unmanaged?'Atención':x.activeRisks?'En control':'Sin evaluar',reason:'Cobertura de tratamiento registrada'};
+ const overdueSignal=x.overdue?{level:'critical',label:'Crítico',reason:'Existen acciones vencidas'}:{level:state.actions.length?'ok':'unknown',label:state.actions.length?'En control':'Sin evaluar',reason:'No se registran acciones vencidas'};
+ const continuitySignal=x.unverified?{level:'warning',label:'Atención',reason:'Continuidad de servicios críticos no validada'}:{level:x.criticalServices?'ok':'unknown',label:x.criticalServices?'En control':'Sin evaluar',reason:'Estado de pruebas de continuidad'};
+ const capacitySignal=x.capacityAlerts+x.teamAlerts?{level:'critical',label:'Crítico',reason:'Capacidad o equipos exceden umbrales'}:{level:state.capacities.length+state.teamCapacities.length?'ok':'unknown',label:state.capacities.length+state.teamCapacities.length?'En control':'Sin evaluar',reason:'Controles de capacidad registrados'};
+ const availSignal=x.slaBreaches?{level:'critical',label:'Crítico',reason:'Incumplimiento observado de SLA'}:{level:x.averageAvailability!==null?'ok':'unknown',label:x.averageAvailability!==null?'En control':'Sin evaluar',reason:'Disponibilidad calculada a partir de registros'};
+ const verticalRows=state.verticals.map(v=>{
+   const signal=verticalSignal(state,v.id,ts);
+   const count=state.risks.filter(r=>r.verticalId===v.id&&r.status==='abierto').length;
+   const cap=worstSignal([...state.capacities.filter(c=>c.verticalId===v.id).map(infrastructureSignal),...state.teamCapacities.filter(c=>c.verticalId===v.id).map(workforceSignal)]);
+   const cont=worstSignal(state.services.filter(s=>s.verticalId===v.id).map(serv=>serviceSignal(serv,ts)));
+   const due=state.actions.filter(a=>a.status!=='completada'&&state.risks.some(r=>r.verticalId===v.id&&r.id===a.riskId));
+   const acts=worstSignal(due.map(a=>actionSignal(a,ts)));
+   return '<tr><td><div class="executive-table-title">'+esc(v.name)+'</div><div class="executive-table-meta">'+esc(v.owner)+'</div></td><td>'+semaphore(signal)+'</td><td><span class="mono-n">'+count+'</span> abiertos</td><td>'+semaphore(cap)+'</td><td>'+semaphore(cont)+'</td><td>'+semaphore(acts)+'</td></tr>';
+ }).join('');
+ return `<section class="executive-summary signal-border-${x.status.level}" aria-label="Síntesis ejecutiva">
+  <div class="executive-summary-upper">
+    <div><span class="executive-overline">EXECUTIVE SITUATION REPORT / ${esc(ts)}</span>
+      <h2>Estado de la operación <span class="executive-status-mark">${semaphore(x.status)}</span></h2>
+      <p class="executive-summary-text">${esc(x.sentence)}</p>
+      <div class="summary-footnotes"><span>Indicadores derivados de ${state.verticals.length} verticales y ${state.services.length} servicios</span><span>Datos del navegador · No es telemetría en vivo</span></div>
+    </div>
+    <div class="summary-aside"><div class="summary-aside-header">FRENTE DE DECISIONES</div><div class="summary-aside-value">${x.pendingDecisions}</div><span>Temas pendientes de comité</span><div class="summary-aside-bottom">${semaphore(financeSignal)} ${mini('Ver comité ↗','view:committee','','secondary')}</div></div>
+  </div>
+ </section>
+ <div class="section-eyeline">01 / PANEL DE CONTROL · EXCEPCIONES PRIORITARIAS</div>
+ <div class="executive-dashboard">
+  <div class="executive-kpis">
+   ${indicator('RIESGOS CRÍTICOS SIN PLAN',x.criticalUnmanaged,'Exposición ≥15/25 sin acción asignada',riskCritical)}
+   ${indicator('ACCIONES VENCIDAS',x.overdue,'Compromisos sin evidencia de cierre',overdueSignal)}
+   ${indicator('CONTINUIDAD NO VALIDADA',x.unverified,'Servicios Tier 1 sin prueba DR aprobada',continuitySignal)}
+   ${indicator('ALERTAS DE CAPACIDAD',x.capacityAlerts+x.teamAlerts,'Recursos y equipos fuera de umbral',capacitySignal)}
+  </div>
+  <section class="executive-panel readiness-panel"><div class="executive-panel-head"><div><span class="executive-overline">DOMINIOS DE CONTROL</span><h3>Lectura gerencial</h3></div></div>
+    ${dimension.map(d=>signalLine(...d)).join('')}
+  </section>
  </div>
- <div class="section-eyeline">01 / SITUACIÓN OPERATIVA Y EXPOSICIÓN</div>
- <div class="layout-two">
-  <section class="panel"><div class="panel-head"><div><h2>Riesgos que requieren decisión</h2><p>Priorizados por probabilidad × impacto; sin plan asociado.</p></div>${mini('Registrar riesgo','risk')}</div>
-   ${alerts.length?'<ul class="list">'+alerts.map(r=>`<li><div class="item-line"><div><div class="item-title">${esc(r.title)}</div><div class="item-detail">${esc(getVertical(r.verticalId)?.name||'Sin vertical')} · Responsable: ${esc(r.owner)} · Riesgo ${severity(r).score}/25</div></div><div class="item-actions">${tag('Sin plan','red')}${mini('Crear plan','action',r.id)}</div></div></li>`).join('')+'</ul>':empty('Sin riesgos pendientes de plan','Los riesgos abiertos tienen un tratamiento registrado.')}
+ <div class="executive-microline">
+  <div><span class="micro-label">DISPONIBILIDAD MEDIA OBSERVADA</span><strong>${x.averageAvailability===null?'S/D':fmtPct(x.averageAvailability)}</strong>${semaphore(availSignal)}<small>Promedio simple entre servicios con datos · no ponderado</small></div>
+  <div><span class="micro-label">DR APROBADO VIGENTE</span><strong>${x.criticalServices?x.provenDR+'/'+x.criticalServices:'S/D'}</strong>${semaphore(continuitySignal)}<small>Tier 1 · criterio ilustrativo: prueba ≤180 días</small></div>
+  <div><span class="micro-label">TRATAMIENTO DE RIESGOS</span><strong>${x.riskTreatmentPct===null?'S/D':fmtPct(x.riskTreatmentPct)}</strong>${semaphore(riskCritical)}<small>Abiertos con al menos una acción</small></div>
+ </div>
+ <div class="section-eyeline">02 / HEALTH CHECK · VERTICALES TECNOLÓGICAS</div>
+ <section class="executive-panel"><div class="executive-panel-head"><div><span class="executive-overline">TECHNOLOGY GOVERNANCE MATRIX</span><h3>Semáforo por vertical</h3><p>Estado consolidado según la peor señal registrada; gris indica información ausente.</p></div>${mini('Abrir verticales ↗','view:verticals','','secondary')}</div>
+  ${verticalRows?'<div class="table-wrap"><table class="data-table executive-data-table"><thead><tr><th>VERTICAL / RESPONSABLE</th><th>ESTADO</th><th>RIESGOS</th><th>CAPACITY</th><th>CONTINUIDAD</th><th>ACCIONES</th></tr></thead><tbody>'+verticalRows+'</tbody></table></div>':empty('Sin verticales registradas','Agregá una vertical para habilitar el semáforo consolidado.')}
+ </section>
+ <div class="section-eyeline">03 / RISK INTELLIGENCE · PRIORIZACIÓN</div>
+ <div class="layout-two executive-lower">
+  <section class="executive-panel"><div class="executive-panel-head"><div><span class="executive-overline">RISK EXPOSURE / 5 × 5</span><h3>Matriz de riesgos</h3><p>Riesgos abiertos por probabilidad e impacto. Los tonos son niveles de exposición, no estados de tratamiento.</p></div>${mini('Registro de riesgos ↗','view:risks','','secondary')}</div>
+   ${heatmap(state.risks)}<div class="heatmap-legend"><span><i class="legend-spot heatmap-ok"></i> Bajo / medio</span><span><i class="legend-spot heatmap-warning"></i> Alto</span><span><i class="legend-spot heatmap-critical"></i> Crítico</span></div>
   </section>
-  <section class="panel"><div class="panel-head"><div><h2>Compromisos próximos</h2><p>Acciones abiertas ordenadas por vencimiento.</p></div>${mini('Ver acciones','view:actions','','secondary')}</div>
-   ${due.length?'<ul class="list">'+due.map(a=>`<li><div class="item-line"><div><div class="item-title">${esc(a.title)}</div><div class="item-detail">${esc(a.owner)} · Vence ${esc(a.dueDate)}</div></div>${actionOverdue(a,today())?tag('Vencida','red'):tag(a.status==='en-curso'?'En curso':'Pendiente','amber')}</div></li>`).join('')+'</ul>':empty('Sin acciones pendientes','Registrá planes asociados a riesgos para iniciar el seguimiento.')}
+  <section class="executive-panel"><div class="executive-panel-head"><div><span class="executive-overline">FOLLOW-UP / GOVERNANCE</span><h3>Acciones y riesgos prioritarios</h3><p>Excepciones que requieren responsable, plan o decisión.</p></div></div>
+   <div class="executive-priority-list">
+    ${untreated.length?untreated.map(r=>'<div class="priority-record">'+semaphore(riskSignal(r,state.actions,ts))+'<div><strong>'+esc(r.title)+'</strong><small>'+esc(r.owner)+' · exposición '+severity(r).score+'/25</small></div>'+mini('Crear plan ↗','action',r.id)+'</div>').join(''):empty('Sin riesgos críticos pendientes','No hay riesgos críticos sin tratamiento registrados.')}
+    ${due.filter(a=>actionSignal(a,ts).level==='critical').map(a=>'<div class="priority-record">'+semaphore(actionSignal(a,ts))+'<div><strong>'+esc(a.title)+'</strong><small>'+esc(a.owner)+' · vence '+esc(a.dueDate)+'</small></div>'+mini('Ver acciones ↗','view:actions','','secondary')+'</div>').join('')}
+   </div>
   </section>
  </div>
- <div class="section-eyeline">02 / GOBIERNO DE LA CONTINUIDAD</div>
- <div class="layout-two layout-equal">
-  <section class="panel"><div class="panel-head"><div><h2>Continuidad sin evidencia suficiente</h2><p>Servicios de criticidad 1 sin ensayo DR aprobado.</p></div>${mini('Abrir continuidad','view:continuity','','secondary')}</div>
-  ${dr.length?'<ul class="list">'+dr.map(s=>`<li><div class="item-line"><div><div class="item-title">${esc(s.name)}</div><div class="item-detail">RTO objetivo: ${esc(s.rtoMin)} min · RPO objetivo: ${esc(s.rpoMin)} min</div></div>${tag(continuity(s).label,'amber')}</div></li>`).join('')+'</ul>':empty('Continuidad registrada','No hay servicios críticos con pruebas pendientes según los registros.')}
-  </section>
-  <section class="panel"><div class="panel-head"><div><h2>Capacidad en umbral</h2><p>Mediciones que requieren evaluación de crecimiento.</p></div>${mini('Cargar capacidad','capacity')}</div>
-  ${cap.length?'<ul class="list">'+cap.slice(0,6).map(c=>`<li><div class="item-line"><div><div class="item-title">${esc(c.name)}</div><div class="item-detail">${esc(getVertical(c.verticalId)?.name||'')} · Umbral ${nfmt(c.thresholdPct)}%</div></div>${tag(fmtPct(capacityStatus(c).utilization),'amber')}</div></li>`).join('')+'</ul>':empty('Sin alertas vigentes','Los recursos cargados permanecen bajo los umbrales definidos.')}
-  </section>
- </div>
- <div class="section-eyeline">03 / RECORRIDO DE GESTIÓN</div>
- <section class="panel"><div class="process-flow"><div class="process-step"><strong>01 / EVALUAR</strong><p>Registrar un assessment o medición de capacidad.</p></div><div class="process-step"><strong>02 / DETECTAR</strong><p>El sistema crea un riesgo por brechas de madurez o capacidad.</p></div><div class="process-step"><strong>03 / ACTUAR</strong><p>Asignar un plan, responsable, fecha y evidencia.</p></div><div class="process-step"><strong>04 / VALIDAR</strong><p>Confirmar acciones y validar el cierre del riesgo.</p></div></div></section>
- <div class="section-eyeline">04 / ACTIVIDAD REGISTRADA</div>
- <section class="panel"><ul class="list">${state.events.length?state.events.slice(0,7).map(e=>`<li><div class="item-line"><div><div class="item-title">${esc(e.text)}</div><div class="item-detail">${esc(e.date)} · ${esc(e.type)}</div></div></div></li>`).join(''):'<li>Sin actividad todavía.</li>'}</ul></section>`;
+ <div class="section-eyeline">04 / TRAZABILIDAD DE GESTIÓN</div>
+ <section class="executive-panel"><div class="executive-panel-head"><div><h3>De la brecha al cierre verificable</h3><p>Un riesgo no se considera mitigado únicamente por haber completado la acción.</p></div></div>
+  <div class="process-flow"><div class="process-step"><strong>01 / EVALUAR</strong><p>Assessment o capacidad registrada.</p></div><div class="process-step"><strong>02 / IDENTIFICAR</strong><p>Riesgo y criticidad calculados.</p></div><div class="process-step"><strong>03 / EJECUTAR</strong><p>Plan, responsable, plazo y evidencia.</p></div><div class="process-step"><strong>04 / VALIDAR</strong><p>Verificación independiente del cierre.</p></div></div>
+ </section>
+ `;
 }
+
 function verticalsView(){
  const cards=state.verticals.map(v=>{
    const assessments=state.assessments.filter(a=>a.verticalId===v.id);
