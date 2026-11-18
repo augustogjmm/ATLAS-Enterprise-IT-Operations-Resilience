@@ -1,0 +1,15 @@
+{
+  "name": "atlas-executive-it-operations",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Synthetic executive IT architecture, operations and resilience simulator.",
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check src/data.js && node --check src/engine.js && node --check public/app.js && node --check scripts/build.mjs",
+    "build": "node scripts/build.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
