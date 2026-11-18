@@ -35,7 +35,7 @@ export const SCENARIOS = Object.freeze([
     description: 'Sin fallas simuladas. Evaluá la redundancia, los objetivos y las dependencias compartidas.',
     failed: [], manualRecovery: 0, dataLoss: 0 },
   { id: 'dc-north', label: 'Caída del data center principal', category: 'Falla de sitio',
-    description: 'Full loss of DC Norte; alternate paths require service-specific recovery time.',
+    description: 'Pérdida total del DC Norte. La recuperación depende de las rutas alternativas y de los tiempos estimados de cada servicio.',
     failed: ['network-a', 'compute-a', 'data-a', 'identity-a', 'batch-a'],
     manualRecovery: 240, dataLoss: 0 },
   { id: 'dc-south', label: 'Caída del data center secundario', category: 'Redundancia comprometida',
