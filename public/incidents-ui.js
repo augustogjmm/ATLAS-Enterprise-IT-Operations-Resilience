@@ -1,10 +1,15 @@
 import {incidentMetrics,incidentMonthly,incidentByService,resolutionMinutes} from './lib/governance/incidents.js';
+import {kpiResult} from './lib/governance/performance.js';
 
 export function incidentsView(state,today,{esc,mini,semaphore,empty,nfmt,fmtPct}){
  const stats=incidentMetrics(state,today),monthly=incidentMonthly(state,today),services=incidentByService(state);
  const signal=(level,reason)=>semaphore({level,label:level==='critical'?'Crítico':level==='warning'?'Atención':level==='ok'?'En control':'Sin evaluar',reason});
  const fmtMinutes=value=>value===null?'S/D':nfmt(value)+' min';
  const set=state.incidents||[],has=!!set.length;
+ const mttrKpi=state.kpis?.find(k=>k.metric==='mttr_90d'),criticalKpi=state.kpis?.find(k=>k.metric==='critical_incidents_30d');
+ const mttrLevel=mttrKpi?kpiResult(state,mttrKpi,today).level:'unknown';
+ const criticalLevel=criticalKpi?kpiResult(state,criticalKpi,today).level:'unknown';
+ const evaluatedKpi=(kpi,level,description)=>kpi?signal(level,description):semaphore({level:'unknown',label:'Sin meta',reason:description});
  const riskLevel=!has?'unknown':stats.criticalOpen?'critical':stats.open?'warning':'ok';
  const max=Math.max(1,...monthly.map(m=>m.opened));
  const chart=monthly.map(slot=>{
@@ -40,10 +45,10 @@ export function incidentsView(state,today,{esc,mini,semaphore,empty,nfmt,fmtPct}
  <div class="summary-aside"><div class="summary-aside-header">INCIDENTES ABIERTOS</div><div class="summary-aside-value">${stats.open}</div><span>${stats.criticalOpen} abiertos P1 / P2</span>${signal(riskLevel,'Semáforo basado en abiertos P1/P2 y pendientes')}</div></div></section>
  <div class="section-eyeline">01 / OPERACIÓN · KPIS CALCULADOS</div>
  <div class="itsm-kpi-grid">
-  <article class="performance-kpi signal-border-${stats.mttr90===null?'unknown':'ok'}"><div class="performance-kpi-top"><span class="executive-overline">MTTR · ÚLTIMOS 90 DÍAS</span>${signal(stats.mttr90===null?'unknown':'ok','Tiempo medio de incidentes resueltos en el período; sin meta definida en este panel')}</div><div class="performance-actual">${esc(fmtMinutes(stats.mttr90))}</div><p>Media desde apertura hasta resolución de ${stats.resolved90} incidente(s) cerrados en los últimos 90 días.</p></article>
-  <article class="performance-kpi signal-border-${stats.critical30?'critical':has?'ok':'unknown'}"><div class="performance-kpi-top"><span class="executive-overline">P1 / P2 · ÚLTIMOS 30 DÍAS</span>${signal(stats.critical30?'critical':has?'ok':'unknown','Incidentes prioritarios abiertos en el período')}</div><div class="performance-actual">${has?stats.critical30:'S/D'}</div><p>Incidentes críticos ingresados en los últimos 30 días, incluyendo casos resueltos.</p></article>
+  <article class="performance-kpi signal-border-${mttrLevel}"><div class="performance-kpi-top"><span class="executive-overline">MTTR · ÚLTIMOS 90 DÍAS</span>${evaluatedKpi(mttrKpi,mttrLevel,'MTTR comparado con la meta del KPI configurado; no equivale a downtime.')}</div><div class="performance-actual">${esc(fmtMinutes(stats.mttr90))}</div><p>Media desde apertura hasta resolución de ${stats.resolved90} incidente(s) cerrados en los últimos 90 días.</p></article>
+  <article class="performance-kpi signal-border-${criticalLevel}"><div class="performance-kpi-top"><span class="executive-overline">P1 / P2 · ÚLTIMOS 30 DÍAS</span>${evaluatedKpi(criticalKpi,criticalLevel,'P1/P2 ingresados en 30 días, comparados con el KPI si existe.')}</div><div class="performance-actual">${has?stats.critical30:'S/D'}</div><p>Incidentes críticos ingresados en los últimos 30 días, incluyendo casos resueltos.</p></article>
   <article class="performance-kpi signal-border-${riskLevel}"><div class="performance-kpi-top"><span class="executive-overline">INCIDENTES PENDIENTES</span>${signal(riskLevel,'Casos sin fecha de resolución')}</div><div class="performance-actual">${has?stats.open:'S/D'}</div><p>${stats.criticalOpen} prioritarios P1/P2 abiertos de ${stats.total} registros históricos.</p></article>
-  <article class="performance-kpi signal-border-${stats.resolved90?'ok':'unknown'}"><div class="performance-kpi-top"><span class="executive-overline">CIERRES · ÚLTIMOS 90 DÍAS</span>${signal(stats.resolved90?'ok':'unknown','Cantidad de incidentes cerrados')}</div><div class="performance-actual">${stats.resolved90}</div><p>Cierres utilizados para calcular MTTR. Los pendientes no entran en el promedio.</p></article>
+  <article class="performance-kpi signal-border-unknown"><div class="performance-kpi-top"><span class="executive-overline">CIERRES · ÚLTIMOS 90 DÍAS</span>${semaphore({level:'unknown',label:'Medición',reason:'Cantidad observada de cierres; sin objetivo configurado.'})}</div><div class="performance-actual">${stats.resolved90}</div><p>Cierres utilizados para calcular MTTR. Los pendientes no entran en el promedio.</p></article>
  </div>
  <div class="section-eyeline">02 / HISTÓRICO MENSUAL</div>
  <div class="layout-two layout-equal">
