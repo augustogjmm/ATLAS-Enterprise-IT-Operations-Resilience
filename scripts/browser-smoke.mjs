@@ -31,7 +31,7 @@ try {
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   const address = server.address();
-  const url = 'http://127.0.0.1:' + address.port;
+  const url = 'http://127.0.0.1:' + address.port + '/simulador.html';
   await mkdir(artifacts, { recursive: true });
 
   const desktop = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
