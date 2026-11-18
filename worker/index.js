@@ -4,6 +4,7 @@ import {ensureIncidentState, validateIncidentState} from '../src/governance/inci
 import {verifyAccessToken, AccessError} from './auth.js';
 
 // API V5 aislada del frontend V4. No se publica ni conecta sin Access y D1.
+const MAX_WORKSPACES_PER_TENANT = 10; // Límite deliberado de la demo en plan gratuito.
 const ROLES = Object.freeze({
   owner: ['read','write','members','privileged-members','audit','restore'],
   admin: ['read','write','members','audit','restore'],
@@ -161,13 +162,19 @@ export function createHandler({verify = verifyAccessToken} = {}) {
         if (!name || name.length > 100) throw new ApiError('Nombre de workspace inválido');
         const state=normalizeState(data.state ?? makeEmpty());
         const id=crypto.randomUUID(),auditId=crypto.randomUUID(),now=new Date().toISOString();
-        await db.batch([
-          db.prepare('INSERT INTO atlas_workspaces(id,tenant_id,name,revision,state_json,created_by,updated_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)')
-            .bind(id,tenantId,name,1,JSON.stringify(state),identity.email,identity.email,now,now),
-          db.prepare('INSERT INTO atlas_audit_events(id,tenant_id,workspace_id,actor_email,action,previous_revision,new_revision,metadata_json,occurred_at) VALUES(?,?,?,?,?,?,?,?,?)')
-            .bind(auditId,tenantId,id,identity.email,'workspace.created',null,1,JSON.stringify({name}),now),
+        const created=await db.batch([
+          db.prepare(
+            'INSERT INTO atlas_workspaces(id,tenant_id,name,revision,state_json,created_by,updated_by,created_at,updated_at) '+
+            'SELECT ?,?,?,?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM atlas_workspaces WHERE tenant_id=?) < ?'
+          ).bind(id,tenantId,name,1,JSON.stringify(state),identity.email,identity.email,now,now,tenantId,MAX_WORKSPACES_PER_TENANT),
+          db.prepare(
+            'INSERT INTO atlas_audit_events(id,tenant_id,workspace_id,actor_email,action,previous_revision,new_revision,metadata_json,occurred_at) '+
+            'SELECT ?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM atlas_workspaces WHERE id=? AND tenant_id=?)'
+          ).bind(auditId,tenantId,id,identity.email,'workspace.created',null,1,JSON.stringify({name}),now,id,tenantId),
           storeRevision(db,tenantId,id,1,identity.email,now,auditId)
         ]);
+        if (created[0]?.meta?.changes !== 1)
+          throw new ApiError('Se alcanzó el límite de '+MAX_WORKSPACES_PER_TENANT+' workspaces por organización',429);
         return reply({id,name,revision:1},201);
       }
       if (resource==='workspaces' && path.length===6 && request.method==='GET') {
