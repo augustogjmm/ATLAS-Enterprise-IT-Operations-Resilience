@@ -146,6 +146,7 @@ export function validatePerformanceState(state){
 }
 export function addKpi(state,record,idFactory){
   ensurePerformanceState(state);
+  if(record.target===undefined||record.target===null||String(record.target).trim()==='')throw new Error('Indicá una meta numérica para el KPI.');
   const kpi={id:idFactory('kpi'),name:record.name?.trim()||'',metric:record.metric,
     target:Number(record.target),owner:record.owner?.trim()||'',verticalId:record.verticalId||''};
   state.kpis.push(kpi);
@@ -162,6 +163,7 @@ export function addObjective(state,record,idFactory){
 }
 export function addKeyResult(state,record,idFactory){
   ensurePerformanceState(state);
+  if(record.baseline===undefined||String(record.baseline).trim()===''||record.target===undefined||String(record.target).trim()==='')throw new Error('Indicá línea base y meta numéricas.');
   const result={id:idFactory('kr'),objectiveId:record.objectiveId,kpiId:record.kpiId,
     baseline:Number(record.baseline),target:Number(record.target)};
   state.keyResults.push(result);
