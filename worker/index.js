@@ -31,7 +31,7 @@ function validId(value) {
   return typeof value === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(value);
 }
 function validEmail(value) {
-  return typeof value === 'string' && value.length <= 254 && /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(value);
+  return typeof value === 'string' && value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 function normalizeState(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new ApiError('Estado inválido');
@@ -47,7 +47,7 @@ function normalizeState(input) {
   return state;
 }
 async function readBody(request) {
-  if (!/^application\\/json(?:\\s*;|$)/i.test(request.headers.get('content-type') || ''))
+  if (!/^application\/json(?:\s*;|$)/i.test(request.headers.get('content-type') || ''))
     throw new ApiError('Se requiere Content-Type application/json', 415);
   const hinted = Number(request.headers.get('content-length') || 0);
   if (hinted > 1024 * 1024) throw new ApiError('Máximo 1 MiB por operación', 413);
