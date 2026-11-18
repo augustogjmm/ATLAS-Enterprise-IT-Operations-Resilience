@@ -1,7 +1,7 @@
 import {
   DOMAINS, makeEmpty, createDemo, assertValidState, dashboard, severity, riskTreatment,
   actionOverdue, capacityStatus, availability, continuity, registerAssessment,
-  registerCapacity, registerAction, completeAction, validateRisk, addEvent
+  registerCapacity, teamStatus, registerTeamCapacity, registerAction, completeAction, validateRisk, addEvent
 } from './lib/governance/core.js';
 
 const STORAGE_KEY='atlas-governance-workspace-v1';
@@ -59,11 +59,12 @@ function overview(){
  const due=state.actions.filter(a=>a.status!=='completada').sort((a,b)=>a.dueDate.localeCompare(b.dueDate)).slice(0,5);
  const dr=state.services.filter(s=>Number(s.criticality)===1&&!continuity(s).ok);
  const cap=state.capacities.filter(c=>capacityStatus(c).warning);
+ const teams=state.teamCapacities.filter(c=>teamStatus(c).warning);
  return `<div class="grid-kpis">
    <article class="kpi danger"><div class="kpi-label">RIESGOS CRÍTICOS SIN PLAN</div><div class="kpi-value">${s.criticalUnmanaged}</div><div class="kpi-hint">${s.unmanaged} riesgos abiertos sin tratamiento de ${s.activeRisks} activos</div></article>
    <article class="kpi warn"><div class="kpi-label">ACCIONES VENCIDAS</div><div class="kpi-value">${s.overdue}</div><div class="kpi-hint">Plazos superados, sin evidencia de cierre</div></article>
    <article class="kpi warn"><div class="kpi-label">SERVICIOS CRÍTICOS / DR NO VALIDADO</div><div class="kpi-value">${s.drGaps}</div><div class="kpi-hint">Prueba parcial, fallida o no evaluada</div></article>
-   <article class="kpi"><div class="kpi-label">RECURSOS CON ALERTA DE CAPACIDAD</div><div class="kpi-value">${s.capacityAlerts}</div><div class="kpi-hint">Medición utilizada ≥ umbral definido</div></article>
+   <article class="kpi"><div class="kpi-label">ALERTAS DE CAPACIDAD</div><div class="kpi-value">${s.capacityAlerts+s.teamAlerts}</div><div class="kpi-hint">Recursos: ${s.capacityAlerts} · Equipos: ${s.teamAlerts}</div></article>
  </div>
  <div class="section-eyeline">01 / SITUACIÓN OPERATIVA Y EXPOSICIÓN</div>
  <div class="layout-two">
@@ -95,8 +96,9 @@ function verticalsView(){
    const risks=state.risks.filter(r=>r.verticalId===v.id&&r.status==='abierto');
    const without=risks.filter(r=>riskTreatment(r,state.actions)==='Sin plan');
    const capacities=state.capacities.filter(c=>c.verticalId===v.id&&capacityStatus(c).warning);
+   const teams=state.teamCapacities.filter(c=>c.verticalId===v.id&&teamStatus(c).warning);
    return `<article class="vertical-card"><div class="vertical-head"><div><h3>${esc(v.name)}</h3><p>${esc(v.description)}<br>Responsable: ${esc(v.owner)}</p></div>${tag(without.length?'Prioridad de gestión':'En control',without.length?'amber':'neutral')}</div>
-   <div class="vertical-stats"><div class="vertical-stat"><span>MADUREZ / 5</span><strong>${mean===null?'—':nfmt(mean)}</strong></div><div class="vertical-stat"><span>RIESGOS SIN PLAN</span><strong>${without.length}</strong></div><div class="vertical-stat"><span>CAPACITY ALERTAS</span><strong>${capacities.length}</strong></div></div>
+   <div class="vertical-stats"><div class="vertical-stat"><span>MADUREZ / 5</span><strong>${mean===null?'—':nfmt(mean)}</strong></div><div class="vertical-stat"><span>RIESGOS SIN PLAN</span><strong>${without.length}</strong></div><div class="vertical-stat"><span>CAPACITY ALERTAS</span><strong>${capacities.length+teams.length}</strong></div></div>
    </article>`;
  }).join('');
  return `<section class="panel"><div class="panel-head"><div><h2>Verticales tecnológicas</h2><p>Dominio, accountability, madurez y exposición agregada.</p></div>${mini('Agregar vertical','vertical')}</div><div class="vertical-grid">${cards||empty('No hay verticales','Agregá una unidad de gestión para empezar.')}</div></section>`;
@@ -109,7 +111,11 @@ function capacityView(){
  }).join('');
  return `<section class="panel"><div class="panel-head"><div><h2>Capacidad y previsión</h2><p>Utilización por recurso y proyección compuesta de tres meses (supuesto de crecimiento constante).</p></div>${mini('+ Nueva medición','capacity')}</div>
  ${rows?'<div class="table-wrap"><table class="data-table"><thead><tr><th>RECURSO / VERTICAL</th><th>USO Y TOTAL</th><th>UTILIZACIÓN</th><th>PROYECCIÓN 3 MESES</th><th>ESTADO</th></tr></thead><tbody>'+rows+'</tbody></table></div>':empty('Sin mediciones','Agregá una capacidad para registrar uso, límite y crecimiento.')}
- <div class="modal-note">Automatización real: al registrar una medición sobre el umbral, ATLAS crea un riesgo vinculado con estado «Sin plan». La proyección no es telemetría: se calcula exclusivamente con los valores ingresados.</div></section>`;
+ <div class="modal-note">Automatización real: al registrar una medición sobre el umbral, ATLAS crea un riesgo vinculado con estado «Sin plan». La proyección no es telemetría: se calcula exclusivamente con los valores ingresados.</div></section>
+ <section class="panel"><div class="panel-head"><div><h2>Capacidad de los equipos y cobertura</h2><p>FTE disponibles, FTE asignados, capacidad de guardias y brechas de habilidades por equipo; no evalúa personas individuales.</p></div>${mini('+ Registrar capacidad de equipo','team')}</div>
+ ${state.teamCapacities.length?'<div class="table-wrap"><table class="data-table"><thead><tr><th>EQUIPO / VERTICAL</th><th>ASIGNACIÓN / DISPONIBILIDAD</th><th>CARGA DE TRABAJO</th><th>COBERTURA</th><th>BRECHAS / SITUACIÓN</th></tr></thead><tbody>'+
+ state.teamCapacities.map(t=>{const z=teamStatus(t);return `<tr><td><span class="cell-title">${esc(t.name)}</span><span class="cell-meta">${esc(getVertical(t.verticalId)?.name||'')} · ${esc(t.owner)}</span></td><td>${nfmt(t.allocatedFte)} / ${nfmt(t.availableFte)} FTE</td><td>${fmtPct(z.utilization)}<span class="cell-meta">Umbral de carga: ${nfmt(z.threshold)}%</span></td><td>${fmtPct(z.coverage)}</td><td>${tag(z.warning?'Requiere atención':'Dentro del umbral',z.warning?'amber':'neutral')}<span class="cell-meta">${esc(t.skillsGap||'Sin brechas informadas')}</span></td></tr>`;}).join('')+'</tbody></table></div>':empty('Sin registros de equipos','Registrá disponibilidad, asignación y cobertura de los equipos por vertical.')}
+ <div class="modal-note">Si la carga alcanza el umbral, o la cobertura de guardias cae por debajo del 90%, se genera automáticamente un riesgo asociado al equipo. Los FTE son capacidad del área, no indicadores de desempeño individual.</div></section>`;
 }
 function assessmentsView(){
  const rows=state.assessments.map(a=>{
@@ -196,6 +202,7 @@ function openForm(type,id=''){
  if(type==='vertical'){title='Nueva vertical';fields=input('name','Nombre de la vertical','text','',{required:true,wide:true})+input('owner','Responsable','text','',{required:true})+textarea('description','Alcance y responsabilidades');}
  else if(type==='assessment'){title='Registrar assessment';description='Madurez 1–2 genera un riesgo vinculado automáticamente.';fields=select('verticalId','Vertical',v)+select('domain','Dimensión',DOMAINS.map(x=>[x,x]))+select('score','Madurez',[[1,'1 — Crítica'],[2,'2 — Inicial'],[3,'3 — Definida'],[4,'4 — Gestionada'],[5,'5 — Optimizada']])+input('owner','Responsable','text','',{required:true})+textarea('finding','Hallazgo o brecha')+textarea('evidence','Referencia de evidencia (opcional)','',false);}
  else if(type==='capacity'){title='Registrar medición de capacidad';description='El uso igual o superior al umbral registra un riesgo sin plan automáticamente.';fields=select('verticalId','Vertical',v)+input('name','Recurso o servicio','text','',{required:true})+input('used','Utilizado','number','',{required:true,min:0,step:'any'})+input('total','Capacidad total','number','',{required:true,min:0.001,step:'any'})+input('unit','Unidad (TB, vCPU, Gbps...)','text','TB',{required:true})+input('thresholdPct','Umbral de alerta (%)','number','80',{required:true,min:1,max:100,step:'any'})+input('growthPct','Crecimiento mensual estimado (%)','number','3',{required:true,min:0,max:100,step:'any'})+input('owner','Responsable','text','',{required:true});}
+ else if(type==='team'){title='Capacidad de un equipo';description='La carga sobre el umbral o cobertura inferior al 90% genera un riesgo vinculado.';fields=select('verticalId','Vertical',v)+input('name','Equipo o función','text','',{required:true})+input('availableFte','Capacidad disponible (FTE)','number','',{required:true,min:0.1,step:'any'})+input('allocatedFte','Carga asignada (FTE)','number','',{required:true,min:0,step:'any'})+input('coveragePct','Cobertura operativa / guardias (%)','number','100',{required:true,min:0,max:100,step:'any'})+input('thresholdPct','Umbral de carga (%)','number','90',{required:true,min:1,max:100,step:'any'})+input('owner','Responsable del equipo','text','',{required:true})+textarea('skillsGap','Brechas de capacidades o reemplazos', '', false);}
  else if(type==='risk'){title='Registrar riesgo';fields=input('title','Nombre del riesgo','text','',{required:true,wide:true})+select('verticalId','Vertical',v)+select('serviceId','Servicio afectado (opcional)',serviceOptions())+input('owner','Responsable del riesgo','text','',{required:true})+select('probability','Probabilidad',[[1,'1 — Rara'],[2,'2 — Poco probable'],[3,'3 — Posible'],[4,'4 — Probable'],[5,'5 — Muy probable']])+select('impact','Impacto',[[1,'1 — Menor'],[2,'2 — Bajo'],[3,'3 — Medio'],[4,'4 — Alto'],[5,'5 — Crítico']])+textarea('description','Descripción y consecuencias');}
  else if(type==='action'){title='Nuevo plan correctivo';description='Las acciones deben vincularse con un riesgo abierto.';fields=select('riskId','Riesgo a tratar',r,id)+input('title','Acción comprometida','text','',{required:true,wide:true})+input('owner','Responsable de ejecución','text','',{required:true})+input('dueDate','Fecha comprometida','date',today(),{required:true})+textarea('description','Criterio de cumplimiento / notas','',false);}
  else if(type==='complete'){const a=state.actions.find(x=>x.id===id);if(!a)return notice('Acción inexistente.',true);title='Completar acción';description='La evidencia es obligatoria y el cierre queda trazado.';fields='<div class="modal-note">'+esc(a.title)+'</div>'+textarea('evidence','Evidencia de ejecución');submit='Registrar cierre';}
@@ -221,6 +228,7 @@ function submitRecord(data){
   addEvent(state,'vertical','Se creó una nueva vertical',ts);
  }else if(type==='assessment')registerAssessment(state,{...data,owner:req('owner','responsable'),finding:req('finding','hallazgo')},ts,idFactory);
  else if(type==='capacity')registerCapacity(state,{...data,name:req('name','recurso'),unit:req('unit','unidad'),owner:req('owner','responsable')},ts,idFactory);
+ else if(type==='team')registerTeamCapacity(state,{...data,name:req('name','equipo'),owner:req('owner','responsable')},ts,idFactory);
  else if(type==='risk'){
   severity({probability:Number(data.probability),impact:Number(data.impact)});
   state.risks.unshift({id:idFactory('r'),verticalId:data.verticalId,serviceId:data.serviceId||'',assessmentId:'',capacityId:'',
