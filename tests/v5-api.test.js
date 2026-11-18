@@ -202,3 +202,21 @@ test('límite de tamaño: rechaza cuerpo mayor a 1 MiB sin Content-Length',async
   const response=await call('owner@a.test','POST','/api/v1/tenants/org-a/workspaces',{name:large,state:makeEmpty()});
   assert.equal(response.status,413);
 });
+
+test('gobierno de costos: máximo diez workspaces por organización, rechazo sin auditoría extra',async()=>{
+  const {call,sqlite}=fixture();
+  const base='/api/v1/tenants/org-a/workspaces';
+  for(let n=0;n<10;n++){
+    const made=await call('owner@a.test','POST',base,{name:'Espacio '+n,state:makeEmpty()});
+    assert.equal(made.status,201);
+  }
+  const over=await call('owner@a.test','POST',base,{name:'Exceso',state:makeEmpty()});
+  assert.equal(over.status,429);
+  assert.match(over.body.error,/límite de 10 workspaces/);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM atlas_workspaces WHERE tenant_id=?').get('org-a').n,10);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM atlas_audit_events WHERE tenant_id=?').get('org-a').n,10);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM atlas_workspace_revisions WHERE tenant_id=?').get('org-a').n,10);
+  // El cupo de otra organización no depende de las operaciones de org-a.
+  assert.equal((await call('owner@b.test','POST','/api/v1/tenants/org-b/workspaces',{name:'Independiente'})).status,201);
+  assert.equal((await call('viewer@a.test','GET',base)).status,200);
+});
