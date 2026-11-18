@@ -187,42 +187,65 @@ function capacityView(){
 }
 function assessmentsView(){
  const rows=state.assessments.map(a=>{
- const risk=state.risks.find(r=>r.assessmentId===a.id);
- return `<tr><td><span class="cell-title">${esc(a.domain)}</span><span class="cell-meta">${esc(getVertical(a.verticalId)?.name||'')}</span></td><td>${tag(a.score+'/5',Number(a.score)<=2?'red':Number(a.score)===3?'amber':'neutral')}</td>
- <td><span class="cell-title">${esc(a.finding)}</span><span class="cell-meta">Evidencia: ${esc(short(a.evidence)||'No indicada')}</span></td><td>${esc(a.owner)}<span class="cell-meta">${esc(a.date)}</span></td><td>${risk?tag('Riesgo vinculado',risk.status==='abierto'?'amber':'neutral'):Number(a.score)<=2?tag('Sin vinculación','red'):tag('Sin brecha crítica','neutral')}</td></tr>`;
+  const risk=state.risks.find(r=>r.assessmentId===a.id);
+  return `<tr><td><span class="cell-title">${esc(a.domain)}</span><span class="cell-meta">${esc(getVertical(a.verticalId)?.name||'')}</span></td><td>${semaphore(assessmentSignal(a))}<span class="cell-meta">Madurez ${a.score}/5</span></td>
+  <td><span class="cell-title">${esc(a.finding)}</span><span class="cell-meta">Evidencia: ${esc(short(a.evidence)||'Sin documento referenciado')}</span></td><td>${esc(a.owner)}<span class="cell-meta">${esc(a.date)}</span></td>
+  <td>${risk?semaphore(riskSignal(risk,state.actions,today())):a.score<=2?semaphore({level:'critical',label:'Crítico',reason:'No hay riesgo vinculado.'}):tag('Sin brecha de madurez','neutral')}</td></tr>`;
  }).join('');
- return `<section class="panel"><div class="panel-head"><div><h2>Assessments por dominio</h2><p>Calificación de madurez (1 a 5) con hallazgo, responsable y evidencia.</p></div>${mini('+ Nuevo assessment','assessment')}</div>
- ${rows?'<div class="table-wrap"><table class="data-table"><thead><tr><th>DOMINIO / VERTICAL</th><th>MADUREZ</th><th>HALLAZGO / EVIDENCIA</th><th>RESPONSABLE / FECHA</th><th>TRAZABILIDAD</th></tr></thead><tbody>'+rows+'</tbody></table></div>':empty('Sin evaluaciones','Registrá un assessment para comenzar a medir la madurez.')}
- <div class="modal-note">Regla automática demostrable: una puntuación de madurez de 1 o 2 crea un riesgo vinculado. Una evaluación de 3 a 5 queda registrada sin crear riesgos artificiales.</div></section>`;
+ const crit=state.assessments.filter(a=>assessmentSignal(a).level==='critical').length;
+ const without=state.assessments.filter(a=>!a.evidence).length;
+ return `<div class="executive-microline">
+  <div><span class="micro-label">ASSESSMENTS REGISTRADOS</span><strong>${state.assessments.length}</strong><small>Evaluaciones por dimensión de gobierno</small></div>
+  <div><span class="micro-label">MADUREZ CRÍTICA (1–2 / 5)</span><strong>${crit}</strong>${semaphore(crit?{level:'critical',label:'Crítico',reason:'Existe madurez baja.'}:{level:state.assessments.length?'ok':'unknown',label:state.assessments.length?'En control':'Sin evaluar',reason:'Estado de madurez'})}<small>Brechas que requieren evaluación</small></div>
+  <div><span class="micro-label">SIN EVIDENCIA REFERENCIADA</span><strong>${without}</strong><small>Las evidencias permiten sustentar evaluaciones</small></div></div>
+  <section class="panel"><div class="panel-head"><div><h2>Assessment de verticales y dominios</h2><p>Semáforo por madurez: 1–2 crítico; 3 atención; 4–5 en control. Resultado basado en evaluaciones registradas.</p></div>${mini('+ Nuevo assessment','assessment')}</div>
+  ${rows?'<div class="table-wrap"><table class="data-table"><thead><tr><th>DOMINIO / VERTICAL</th><th>ESTADO</th><th>HALLAZGO / EVIDENCIA</th><th>RESPONSABLE</th><th>RIESGO VINCULADO</th></tr></thead><tbody>'+rows+'</tbody></table></div>':empty('Sin evaluaciones','Registrá un assessment para comenzar la medición.')}
+  <div class="modal-note">La puntuación 1 o 2 crea automáticamente un riesgo con trazabilidad al assessment. El cierre requiere acciones y evidencia, no solo cambiar la calificación.</div></section>`;
 }
 function risksView(){
+ const ts=today();
  const rows=state.risks.map(r=>{
- const sev=severity(r),treat=riskTreatment(r,state.actions),actions=state.actions.filter(a=>a.riskId===r.id);
- const canValidate=r.status==='abierto'&&actions.length>0&&actions.every(a=>a.status==='completada');
- return `<tr><td><span class="cell-title">${esc(r.title)}</span><span class="cell-meta">${esc(short(r.description))}</span></td><td>${esc(getVertical(r.verticalId)?.name||'')}<span class="cell-meta">${esc(r.owner)}</span></td>
- <td>${tag(sev.label+' '+sev.score+'/25',sev.score>=15?'red':sev.score>=9?'amber':'neutral')}</td><td>${tag(treat,treat==='Sin plan'?'red':treat==='Con plan'?'amber':'neutral')}<span class="cell-meta">${actions.length} acción(es) asociadas</span></td>
- <td><div class="item-actions">${r.status==='abierto'?mini('Crear plan','action',r.id):''}${canValidate?mini('Validar mitigación','validate',r.id,'secondary'):''}</div></td></tr>`;
+  const sev=severity(r),treat=riskTreatment(r,state.actions),actions=state.actions.filter(a=>a.riskId===r.id);
+  const signal=riskSignal(r,state.actions,ts);
+  const canValidate=r.status==='abierto'&&actions.length>0&&actions.every(a=>a.status==='completada');
+  return `<tr><td><span class="cell-title">${esc(r.title)}</span><span class="cell-meta">${esc(short(r.description))}</span></td><td>${esc(getVertical(r.verticalId)?.name||'')}<span class="cell-meta">${esc(r.owner)}</span></td>
+   <td><span class="number">${sev.score}/25</span><span class="cell-meta">${sev.label} · P${r.probability} × I${r.impact}</span></td><td>${semaphore(signal)}<span class="cell-meta">${esc(treat)} · ${actions.length} acción(es)</span></td>
+   <td><div class="item-actions">${r.status==='abierto'?mini('Crear plan','action',r.id):''}${canValidate?mini('Validar mitigación','validate',r.id,'secondary'):''}</div></td></tr>`;
  }).join('');
- const s=dashboard(state,today());
+ const summary=executiveSummary(state,ts);
  return `<div class="grid-kpis">
- <article class="kpi"><div class="kpi-label">RIESGOS ABIERTOS</div><div class="kpi-value">${s.activeRisks}</div><div class="kpi-hint">Pendientes de evaluación y tratamiento</div></article>
- <article class="kpi danger"><div class="kpi-label">RIESGOS SIN PLAN</div><div class="kpi-value">${s.unmanaged}</div><div class="kpi-hint">Requieren una acción asignada</div></article>
- <article class="kpi warn"><div class="kpi-label">CRÍTICOS SIN PLAN</div><div class="kpi-value">${s.criticalUnmanaged}</div><div class="kpi-hint">Prioridad elevada</div></article>
- <article class="kpi"><div class="kpi-label">COBERTURA DE TRATAMIENTO</div><div class="kpi-value">${s.riskTreatmentPct===null?'—':num(s.riskTreatmentPct)+'%'}</div><div class="kpi-hint">Riesgos abiertos con al menos una acción</div></article></div>
- <section class="panel"><div class="panel-head"><div><h2>Mapa de exposición</h2><p>Probabilidad × impacto, tratamientos y acciones asociadas.</p></div>${mini('+ Registrar riesgo','risk')}</div>
- ${rows?'<div class="table-wrap"><table class="data-table"><thead><tr><th>RIESGO</th><th>VERTICAL / RESPONSABLE</th><th>EXPOSICIÓN</th><th>TRATAMIENTO</th><th>OPERAR</th></tr></thead><tbody>'+rows+'</tbody></table></div>':empty('Sin riesgos','Registrá un riesgo o generá uno automáticamente desde una evaluación.')}
- </section>`;
+  <article class="kpi"><div class="kpi-label">RIESGOS ABIERTOS</div><div class="kpi-value">${summary.activeRisks}</div><div class="kpi-hint">Tratamiento pendiente o en curso</div></article>
+  <article class="kpi danger"><div class="kpi-label">RIESGOS SIN PLAN</div><div class="kpi-value">${summary.unmanaged}</div><div class="kpi-hint">Sin medidas asignadas</div></article>
+  <article class="kpi warn"><div class="kpi-label">CRÍTICOS SIN PLAN</div><div class="kpi-value">${summary.criticalUnmanaged}</div><div class="kpi-hint">Exposición ≥15/25</div></article>
+  <article class="kpi"><div class="kpi-label">COBERTURA DE TRATAMIENTO</div><div class="kpi-value">${summary.riskTreatmentPct===null?'S/D':num(summary.riskTreatmentPct)+'%'}</div><div class="kpi-hint">Riesgos abiertos con al menos un plan</div></article></div>
+  <div class="layout-two executive-lower">
+   <section class="executive-panel"><div class="executive-panel-head"><div><span class="executive-overline">HEATMAP / EXPOSICIÓN</span><h3>Matriz 5 × 5 de riesgos abiertos</h3><p>Combinación de probabilidad e impacto según los riesgos registrados.</p></div></div>${heatmap(state.risks)}
+    <div class="heatmap-legend"><span><i class="legend-spot heatmap-ok"></i> Bajo / medio</span><span><i class="legend-spot heatmap-warning"></i> Alto</span><span><i class="legend-spot heatmap-critical"></i> Crítico</span></div></section>
+   <section class="executive-panel"><div class="executive-panel-head"><div><span class="executive-overline">RISK TREATMENT / CONTROL</span><h3>Tratamiento y decisiones</h3><p>Semáforo dinámico: considera estado del riesgo, existencia y vencimiento de planes.</p></div></div>
+   ${state.risks.length?state.risks.filter(r=>r.status==='abierto').slice(0,6).map(r=>signalLine(short(r.title),riskSignal(r,state.actions,ts),'Responsable: '+r.owner)).join(''):empty('Sin riesgos evaluados','Registrá un riesgo o assessment para disponer de tratamiento.')}
+   </section>
+  </div>
+  <section class="panel"><div class="panel-head"><div><h2>Registro y tratamiento</h2><p>La exposición y el estado de control se muestran por separado: un riesgo crítico con un plan aún requiere seguimiento.</p></div>${mini('+ Registrar riesgo','risk')}</div>
+  ${rows?'<div class="table-wrap"><table class="data-table"><thead><tr><th>RIESGO</th><th>VERTICAL / RESPONSABLE</th><th>EXPOSICIÓN</th><th>TRATAMIENTO</th><th>PRÓXIMA ACCIÓN</th></tr></thead><tbody>'+rows+'</tbody></table></div>':empty('Sin riesgos','Registrá un riesgo o generá uno desde un assessment.')}
+  </section>`;
 }
 function actionsView(){
+ const ts=today(),open=state.actions.filter(a=>a.status!=='completada');
+ const overdue=open.filter(a=>actionSignal(a,ts).level==='critical').length;
+ const dueSoon=open.filter(a=>actionSignal(a,ts).level==='warning').length;
  const rows=state.actions.map(a=>{
- const risk=getRisk(a.riskId);
- return `<tr><td><span class="cell-title">${esc(a.title)}</span><span class="cell-meta">Riesgo: ${esc(risk?.title||'Sin relación')}</span></td><td>${esc(a.owner)}</td><td>${esc(a.dueDate)}${actionOverdue(a,today())?'<span class="cell-meta text-danger">VENCIDA</span>':''}</td>
- <td>${tag(a.status==='completada'?'Completada':a.status==='en-curso'?'En curso':a.status==='bloqueada'?'Bloqueada':'Pendiente',a.status==='completada'?'neutral':actionOverdue(a,today())?'red':'amber')}</td>
- <td><div class="item-actions">${a.status!=='completada'?mini('Completar + evidencia','complete',a.id):tag('Evidencia registrada','neutral')}</div></td></tr>`;
+  const risk=getRisk(a.riskId),signal=actionSignal(a,ts);
+  return `<tr><td><span class="cell-title">${esc(a.title)}</span><span class="cell-meta">Riesgo: ${esc(risk?.title||'Sin relación')}</span></td><td>${esc(a.owner)}</td><td>${esc(a.dueDate)}${actionOverdue(a,ts)?'<span class="cell-meta text-danger">Vencida</span>':''}</td>
+  <td>${semaphore(signal)}<span class="cell-meta">${a.status==='completada'?'Completada':a.status==='en-curso'?'En curso':a.status==='bloqueada'?'Bloqueada':'Pendiente'}</span></td>
+  <td><div class="item-actions">${a.status!=='completada'?mini('Completar + evidencia','complete',a.id):tag('Evidencia registrada','neutral')}</div></td></tr>`;
  }).join('');
- return `<section class="panel"><div class="panel-head"><div><h2>Planes y compromisos</h2><p>Una acción se considera completada solo cuando se registra evidencia.</p></div>${mini('+ Crear plan','action')}</div>
- ${rows?'<div class="table-wrap"><table class="data-table"><thead><tr><th>ACCIÓN / RIESGO</th><th>RESPONSABLE</th><th>VENCIMIENTO</th><th>ESTADO</th><th>SEGUIMIENTO</th></tr></thead><tbody>'+rows+'</tbody></table></div>':empty('Sin planes','Primero registrá un riesgo abierto y asignale una acción correctiva.')}
- <div class="modal-note">Completar una acción no elimina automáticamente el riesgo: la mitigación requiere una validación independiente con evidencia y todas las acciones cerradas.</div></section>`;
+ return `<div class="executive-microline">
+  <div><span class="micro-label">ACCIONES ABIERTAS</span><strong>${open.length}</strong><small>Sin cierre respaldado por evidencia</small></div>
+  <div><span class="micro-label">VENCIDAS O BLOQUEADAS</span><strong>${overdue}</strong>${semaphore(overdue?{level:'critical',label:'Crítico',reason:'Plazos vencidos o bloqueados'}:{level:state.actions.length?'ok':'unknown',label:state.actions.length?'En control':'Sin evaluar',reason:'Sin vencidas'})}<small>Requieren intervención</small></div>
+  <div><span class="micro-label">PRÓXIMAS A VENCER</span><strong>${dueSoon}</strong><small>Plazos en siete días o menos</small></div></div>
+  <section class="panel"><div class="panel-head"><div><h2>Planes de acción y compromisos</h2><p>Seguimiento de ejecución. La evidencia de una acción no sustituye la validación final de mitigación.</p></div>${mini('+ Crear plan','action')}</div>
+  ${rows?'<div class="table-wrap"><table class="data-table"><thead><tr><th>ACCIÓN / RIESGO</th><th>RESPONSABLE</th><th>VENCIMIENTO</th><th>SEMÁFORO</th><th>EJECUCIÓN</th></tr></thead><tbody>'+rows+'</tbody></table></div>':empty('Sin planes','Primero registrá un riesgo abierto y asignale una acción.')}
+  <div class="modal-note">Rojo = vencida o bloqueada. Ámbar = vence en siete días o menos. Verde = dentro de plazo o completada con evidencia. Gris = información insuficiente.</div></section>`;
 }
 function continuityView(){
  const rows=state.services.map(s=>{
