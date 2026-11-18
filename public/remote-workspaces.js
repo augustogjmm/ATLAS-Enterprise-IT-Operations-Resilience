@@ -39,6 +39,11 @@ export class RemoteWorkspaces {
   open(tenantId,id){return this.request('/tenants/'+segment(tenantId)+'/workspaces/'+segment(id));}
   create(tenantId,name,state){return this.request('/tenants/'+segment(tenantId)+'/workspaces',{method:'POST',body:{name,state}});}
   save(tenantId,id,revision,state){return this.request('/tenants/'+segment(tenantId)+'/workspaces/'+segment(id),{method:'PUT',body:{revision,state}});}
+  revisions(tenantId,id){return this.request('/tenants/'+segment(tenantId)+'/workspaces/'+segment(id)+'/revisions');}
+  restore(tenantId,id,targetRevision,currentRevision){
+    return this.request('/tenants/'+segment(tenantId)+'/workspaces/'+segment(id)+'/revisions/'+segment(targetRevision)+'/restore',
+      {method:'PUT',body:{revision:currentRevision}});
+  }
   audit(tenantId){return this.request('/tenants/'+segment(tenantId)+'/audit');}
   members(tenantId){return this.request('/tenants/'+segment(tenantId)+'/members');}
   setMember(tenantId,email,role,status){
@@ -48,3 +53,4 @@ export class RemoteWorkspaces {
 export const canEditWorkspace = role => ['owner','admin','editor'].includes(role);
 export const canManageMembers = role => ['owner','admin'].includes(role);
 export const canAudit = role => ['owner','admin','auditor'].includes(role);
+export const canRestore = role => ['owner','admin'].includes(role);
