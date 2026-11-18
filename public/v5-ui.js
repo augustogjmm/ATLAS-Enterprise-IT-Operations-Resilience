@@ -1,10 +1,10 @@
-import {RemoteWorkspaces,canEditWorkspace,canAudit,canManageMembers} from './remote-workspaces.js';
+import {RemoteWorkspaces,canEditWorkspace,canAudit,canManageMembers,canRestore} from './remote-workspaces.js';
 
 // Controlador opt-in. Nunca transmite datos de V4 sin confirmación expresa.
 export function mountRemoteV5({getState,getLocal,replaceState,notice,validateState}) {
   const api=new RemoteWorkspaces();
   const s={session:null,tenant:'',workspaces:[],choice:'',role:'',id:'',name:'',revision:0,
-    busy:false,conflict:false,error:'',details:''};
+    busy:false,conflict:false,error:'',details:'',revisions:[]};
   const active=()=>Boolean(s.id);
   const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const option=(id,title,selected)=>'<option value="'+esc(id)+'"'+(id===selected?' selected':'')+'>'+esc(title)+'</option>';
@@ -27,6 +27,7 @@ export function mountRemoteV5({getState,getLocal,replaceState,notice,validateSta
       if(active()){
         out+=button('reload','Recargar servidor',s.busy);
         if(canAudit(s.role))out+=button('audit','Ver auditoría',s.busy);
+        if(canAudit(s.role))out+=button('history','Historial / recuperación',s.busy);
         if(canManageMembers(s.role))out+=button('members','Ver miembros',s.busy);
         if(canManageMembers(s.role))out+=button('manage','Administrar rol',s.busy);
       }
@@ -120,7 +121,7 @@ export function mountRemoteV5({getState,getLocal,replaceState,notice,validateSta
       }
       if(command==='local'){
         if(s.conflict&&!confirm('Existen cambios sin confirmar. Exportá un respaldo antes de descartarlos. ¿Volver al modo local?'))return;
-        s.id='';s.name='';s.revision=0;s.conflict=false;s.error='';s.details='';
+        s.id='';s.name='';s.revision=0;s.conflict=false;s.error='';s.details='';s.revisions=[];
         replaceState(getLocal());render();
         notice('V4 local restaurada sin sobrescribir datos remotos.');
         return;
@@ -133,7 +134,7 @@ export function mountRemoteV5({getState,getLocal,replaceState,notice,validateSta
         const data=validateState(item.state);
         replaceState(data);
         s.id=item.id;s.name=item.name;s.revision=item.revision;
-        s.conflict=false;s.error='';s.details='';
+        s.conflict=false;s.error='';s.details='';s.revisions=[];
         notice('Workspace V5 cargado. Revisión '+s.revision+'.');return;
       }
       if(command==='create'){
@@ -156,6 +157,40 @@ export function mountRemoteV5({getState,getLocal,replaceState,notice,validateSta
         if(!active())return;
         if(s.conflict&&!confirm('Los cambios locales todavía no están guardados. Exportá JSON antes de descartarlos. ¿Recargar?'))return;
         s.choice=s.id;await act('open');return;
+      }
+      if(command==='history'&&active()&&canAudit(s.role)){
+        s.busy=true;render();
+        const result=await api.revisions(s.tenant,s.id);
+        s.revisions=Array.isArray(result.revisions)?result.revisions:[];
+        s.details='<strong>Historial y recuperación</strong><p>Se conservan hasta cinco versiones del workspace. Una restauración crea una nueva revisión y queda auditada; no elimina el historial de acciones del sistema.</p>'+
+          '<div class="table-wrap"><table class="data-table"><thead><tr><th>REVISIÓN</th><th>AUTOR</th><th>FECHA</th></tr></thead><tbody>'+
+          s.revisions.map(x=>'<tr><td>'+esc(x.revision)+'</td><td>'+esc(x.actor_email)+'</td><td>'+esc(x.created_at)+'</td></tr>').join('')+'</tbody></table></div>';
+        if(canRestore(s.role)&&s.revisions.length>1)
+          s.details+='<label class="workspace-field">Versión para restaurar <select id="workspace-restore-revision">'+
+            s.revisions.filter(x=>x.revision!==s.revision).map(x=>option(String(x.revision),'Revisión '+x.revision,String(s.revisions[1]?.revision))).join('')+
+            '</select></label>'+button('restore','Restaurar versión seleccionada');
+        return;
+      }
+      if(command==='restore'&&active()&&canRestore(s.role)){
+        if(s.conflict)return notice('Primero exportá o resolvé los cambios sin guardar.',true);
+        const target=Number(document.getElementById('workspace-restore-revision')?.value);
+        if(!Number.isSafeInteger(target)||!s.revisions.some(x=>x.revision===target)||target===s.revision)
+          return notice('Seleccioná una revisión histórica válida.',true);
+        if(!confirm('¿Restaurar la revisión '+target+'? Se reemplazarán los datos actuales de este workspace, creando una nueva revisión auditada. Exportá primero un respaldo si es necesario.'))return;
+        s.busy=true;s.error='';render();
+        try {
+          await api.restore(s.tenant,s.id,target,s.revision);
+          const current=await api.open(s.tenant,s.id);
+          const checked=validateState(current.state);
+          replaceState(checked);
+          s.revision=current.revision;s.conflict=false;s.details='';s.revisions=[];
+          notice('Revisión '+target+' restaurada como nueva revisión '+current.revision+'.');
+        }catch(err){
+          s.conflict=true;
+          s.error='La restauración no pudo verificarse. Evitá nuevas escrituras, exportá tus datos y recargá el workspace: '+(err.message||'fallo remoto');
+          notice(s.error,true);
+        }
+        return;
       }
       if(command==='audit'&&active()&&canAudit(s.role)){
         s.busy=true;render();
