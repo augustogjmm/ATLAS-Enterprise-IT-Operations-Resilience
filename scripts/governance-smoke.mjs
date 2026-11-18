@@ -52,7 +52,8 @@ try{
  await page.locator('#incident-file').setInputFiles({name:'importacion-itsm-smoke.csv',mimeType:'text/csv',buffer:Buffer.from(incidentCSV)});
  assert.ok(await page.locator('#incident-mapping-form').isVisible());
  assert.equal(await page.locator('[name="col_incident_id"]').inputValue(),'0');
- assert.equal(await page.locator('[name="service_0"]').inputValue(),'s-core');
+ assert.equal(await page.locator('[name="service_0"]').inputValue(),'s-channel');
+ assert.equal(await page.locator('[name="service_1"]').inputValue(),'s-core');
  page.once('dialog',d=>d.accept());
  await page.getByRole('button',{name:'Validar e importar CSV'}).click();
  await page.waitForFunction(()=>document.querySelector('#view-root')?.textContent?.includes('CSV-E2E-01'));
