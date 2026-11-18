@@ -1,0 +1,22 @@
+/* ATLAS V5: controles aislados; conserva el diseño de V4. */
+.workspace-panel{display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:14px 18px;margin:0 0 20px;
+  border:1px solid var(--border, #d4dce7);border-radius:12px;background:var(--surface, #fff);
+  box-shadow:0 6px 18px rgba(18,37,60,.035)}
+.workspace-panel .workspace-title{font-weight:700;color:#1b2b43}
+.workspace-panel .workspace-help{font-size:.81rem;color:#586781}
+.workspace-panel .workspace-field{display:flex;align-items:center;gap:5px;flex-wrap:wrap;font-size:.81rem;color:#47566c}
+.workspace-panel select{max-width:260px;border:1px solid #c5cedb;border-radius:8px;background:white;color:#16253b;
+  padding:8px 9px;min-height:38px}
+.workspace-panel .workspace-status{padding:5px 10px;border-radius:18px;background:#eff3f8;color:#34455d;font-size:.79rem;font-weight:600}
+.workspace-panel .workspace-status.alert{background:#fff3e8;color:#855119}
+.workspace-panel .workspace-status.secure{background:#e9f4ef;color:#175a3d}
+.workspace-panel .button{font-size:.79rem;padding:8px 11px}
+.workspace-panel .workspace-break{flex-basis:100%;height:0}
+.workspace-panel .workspace-warning{color:#8b401c;font-size:.79rem;flex-basis:100%;line-height:1.4}
+.workspace-panel .workspace-warning strong{font-weight:800}
+.workspace-panel [disabled]{opacity:.55;cursor:not-allowed}
+@media(max-width:720px){
+ .workspace-panel{padding:13px;gap:10px}
+ .workspace-panel .workspace-field{width:100%;justify-content:space-between}
+ .workspace-panel select{min-width:0;max-width:65%;flex:1}
+}
