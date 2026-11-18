@@ -54,7 +54,7 @@ Migración `migrations/0001_atlas_v5.sql`:
 
 Se preservan las estructuras y cálculos de V4; no se cambia `SCHEMA_VERSION=1` del dominio mientras los registros sean compatibles. La importación de JSON histórico exige aprobación del usuario y no reemplaza automáticamente los datos remotos.
 
-La edición exige `revision`. Dos editores que intenten modificar la misma revisión no pueden pisarse silenciosamente: la segunda escritura recibe **HTTP 409**. Actualización y evento de auditoría se ejecutan en un lote D1 transaccional; el cambio se registra con identidad, fecha y revisión. En esta fase, el snapshot tiene un límite de 1 MiB y la bitácora lista hasta 100 eventos recientes.
+La edición exige `revision`. Dos editores que intenten modificar la misma revisión no pueden pisarse silenciosamente: la segunda escritura recibe **HTTP 409**. Se agregó historial acotado a las **últimas cinco versiones de cada workspace** (`migrations/0002_atlas_v5_history.sql`): las versiones antiguas se depuran al guardar, para limitar almacenamiento en D1. Los roles `owner` y `admin` pueden restaurar una versión previa, creando una revisión nueva y un evento `workspace.restored` con referencia a la revisión fuente. `auditor` puede consultar metadatos históricos sin restaurar; `editor` y `viewer` no consultan versiones previas. Actualización y evento de auditoría se ejecutan en un lote D1 transaccional; el cambio se registra con identidad, fecha y revisión. En esta fase, el snapshot tiene un límite de 1 MiB y la bitácora lista hasta 100 eventos recientes.
 
 **Importante:** la auditoría está separada de `state.events` editable por usuarios, pero no es inmutable frente a un administrador de la propia base de datos. Una auditoría de cumplimiento formal precisará retención controlada, integridad/almacenamiento externo y procedimiento de revisión.
 
@@ -67,11 +67,15 @@ La edición exige `revision`. Dos editores que intenten modificar la misma revis
 | POST | `/tenants/:tenant/workspaces` | Crear vacío o cargar snapshot V4 validado |
 | GET | `/tenants/:tenant/workspaces/:id` | Leer estado y revisión |
 | PUT | `/tenants/:tenant/workspaces/:id` | Guardar con control de concurrencia |
+| GET | `/tenants/:tenant/workspaces/:id/revisions` | Historial de hasta cinco revisiones (auditor, admin, owner) |
+| PUT | `/tenants/:tenant/workspaces/:id/revisions/:revision/restore` | Restauración auditable como nueva revisión (owner/admin) |
 | GET | `/tenants/:tenant/audit` | Bitácora solo para roles autorizados |
 | GET | `/tenants/:tenant/members` | Directorio controlado |
 | PUT | `/tenants/:tenant/members/:email` | Alta, cambio de rol o revocación por usuario privilegiado |
 
 No existen endpoints anónimos de escritura. Las mutaciones requieren JSON, controlan origen, tamaño y permisos. No se permite CORS abierto. Todas las respuestas API usan `Cache-Control: no-store`.
+
+**Endurecimiento adicional:** toda mutación exige `X-Atlas-CSRF: v5`; se rechaza `Origin` distinto del origen de la app y `Sec-Fetch-Site` ajeno. El cuerpo JSON se recibe de forma incremental con un límite efectivo de 1 MiB aunque el cliente omita o falsifique `Content-Length`. No es una autenticación sustituta de Cloudflare Access: las dos defensas se aplican.
 
 ### 5. Estrategia económica
 
@@ -93,7 +97,7 @@ Referencias oficiales:
 2. Confirmar que V4 funciona con su URL `workers.dev` y que permanece sin cambios.
 3. Verificar plan gratuito de Cloudflare, posibles datos de pago para Access y permiso explícito para activarlo.
 4. Preparar V5 **en un Worker independiente**; copiar `config/wrangler.v5.example.jsonc` a la configuración de la rama de despliegue e incluir valores reales, sin credenciales en GitHub.
-5. Crear D1 nueva (después de la autorización), ejecutar `migrations/0001_atlas_v5.sql` con protección de datos. Provisionar en forma controlada un registro en `atlas_tenants` y una membresía inicial `owner` de correo autorizado.
+5. Crear D1 nueva (después de la autorización), ejecutar **en orden** `migrations/0001_atlas_v5.sql` y `migrations/0002_atlas_v5_history.sql` con protección de datos. Provisionar en forma controlada un registro en `atlas_tenants` y una membresía inicial `owner` de correo autorizado.
 6. Activar Cloudflare Access para **V5 únicamente**, con lista de correos autorizados y audiencia propia; restringir producción y previews.
 7. Probar denegación sin JWT, acceso de editor/viewer/auditor, revocación, fuga entre organizaciones, conflicto 409 y exportación/recuperación de respaldo.
 8. **Implementado en la rama V5:** UI de conexión explícita y selección de organización/workspace, edición con revisión, modo solo lectura, consulta de auditoría y miembros, exportación ante conflictos y confirmación al crear un workspace copiando V4. Se utiliza el `localStorage` V4 solo en modo local; no hay migración silenciosa. La UI de administración de roles es funcional pero provisional (diálogos nativos), pendiente de rediseño para la experiencia ejecutiva.
@@ -112,7 +116,9 @@ Referencias oficiales:
 - «Volver a V4 local» recupera el snapshot local preexistente, sin escribir en D1 ni borrar archivos `localStorage`.
 - «Crear workspace» admite comenzar vacío. La copia de registros locales requiere dos confirmaciones explícitas para evitar transmisión accidental de datos.
 
-**Límites de esta etapa:** no hay sincronización en vivo, resolución automática de conflictos, aprobaciones multiusuario por flujo, firma inmutable de actas ni pruebas contra Cloudflare Access/D1 reales. Los metadatos de auditoría se escriben en D1 solo después de instalarlo y provisionarlo. Las pruebas de navegador utilizan una API simulada con respuestas controladas.
+**Costo incremental de historial:** cada versión retenida ocupa almacenamiento D1, por lo que la retención automática de cinco versiones limita crecimiento, pero NO garantiza que las cuotas gratuitas sean suficientes para cualquier número de workspaces. Antes de desplegar, definir máximo de organizaciones/workspaces y alertas de capacidad; medir filas leídas/escritas y tamaño real de la base.
+
+**Límites de esta etapa:** no hay sincronización en vivo, resolución automática de conflictos, aprobaciones multiusuario por flujo, firma inmutable de actas ni pruebas contra Cloudflare Access/D1 reales. Los metadatos de auditoría se escriben en D1 solo después de instalarlo y provisionarlo. Las pruebas de navegador utilizan una API simulada con respuestas controladas. Incluyen restauración de revisiones en Chromium. En CI se valida además la migración SQL con SQLite nativo, la retención de cinco versiones, restauración con control de concurrencia y la denegación entre organizaciones.
 
 ### 8. Gobierno técnico de V5
 
