@@ -36,7 +36,7 @@ try{
  assert.ok(await page.getByText('Semáforo por vertical').isVisible());
  const executiveSkin=await page.locator('.page-frame').evaluate(el=>getComputedStyle(el).backgroundColor);
  assert.ok(executiveSkin!=='rgb(0, 0, 0)');
- assert.equal((await page.locator('.kpi-value').allInnerTexts())[0],'1');
+ assert.equal((await page.locator('.executive-kpi strong').allInnerTexts())[0],'1');
  assert.ok(await page.getByText('De la brecha a la acción').isVisible());
  await page.screenshot({path:resolve(artifacts,'atlas-governance-desktop.png'),fullPage:true});
 
