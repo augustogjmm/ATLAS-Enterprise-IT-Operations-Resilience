@@ -4,7 +4,7 @@ import {
   registerCapacity, teamStatus, registerTeamCapacity, registerAction, completeAction, validateRisk, addEvent
 } from './lib/governance/core.js';
 import {worstSignal, riskSignal, actionSignal, infrastructureSignal, workforceSignal, assessmentSignal, serviceSignal, verticalSignal, executiveSummary, riskMatrix} from './lib/governance/insights.js';
-import {METRICS,KPI_OPTIONS,ensurePerformanceState,seedDemoPerformance,validatePerformanceState,addKpi,addObjective,addKeyResult,closeObjective} from './lib/governance/performance.js';
+import {METRICS,KPI_OPTIONS,ensurePerformanceState,seedDemoPerformance,validatePerformanceState,kpiResult,objectiveProgress,addKpi,addObjective,addKeyResult,closeObjective} from './lib/governance/performance.js';
 import {performanceView as renderPerformanceView} from './performance-ui.js';
 
 const STORAGE_KEY='atlas-governance-workspace-v1';
@@ -144,6 +144,10 @@ function overview(){
  <div class="section-eyeline">04 / TRAZABILIDAD DE GESTIÓN</div>
  <section class="executive-panel"><div class="executive-panel-head"><div><h3>De la brecha al cierre verificable</h3><p>Un riesgo no se considera mitigado únicamente por haber completado la acción.</p></div></div>
   <div class="process-flow"><div class="process-step"><strong>01 / EVALUAR</strong><p>Assessment o capacidad registrada.</p></div><div class="process-step"><strong>02 / IDENTIFICAR</strong><p>Riesgo y criticidad calculados.</p></div><div class="process-step"><strong>03 / EJECUTAR</strong><p>Plan, responsable, plazo y evidencia.</p></div><div class="process-step"><strong>04 / VALIDAR</strong><p>Verificación independiente del cierre.</p></div></div>
+ </section>
+ <div class="section-eyeline">05 / KPI Y OKR · RESULTADOS TECNOLÓGICOS</div>
+ <section class="executive-panel"><div class="executive-panel-head"><div><span class="executive-overline">STRATEGY EXECUTION</span><h3>Objetivos conectados a indicadores</h3><p>El avance no se carga manualmente: surge de los registros y de las metas definidas.</p></div>${mini('Abrir KPI y OKR ↗','view:performance','','secondary')}</div>
+ ${state.kpis.length?'<div class="performance-overview">'+state.kpis.slice(0,3).map(k=>{const r=kpiResult(state,k,ts);return '<div class="performance-overview-item"><span>'+esc(k.name)+'</span><strong>'+esc(r.value===null?'Sin datos':r.unit==='cantidad'?nfmt(r.value):fmtPct(r.value))+'</strong>'+semaphore({level:r.level,label:r.level==='ok'?'En meta':r.level==='unknown'?'Sin evaluar':'Desviado',reason:r.description})+'</div>';}).join('')+'</div>':empty('KPI pendientes de configuración','Entrá en KPI y OKR para definir tus primeros indicadores.')}
  </section>
  `;
 }
