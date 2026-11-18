@@ -41,7 +41,7 @@ try{
  await page.screenshot({path:resolve(artifacts,'atlas-governance-desktop.png'),fullPage:true});
  // KPI y OKR: catálogos calculados, altas operativas y relaciones entre registros.
  await page.locator('button[data-view="performance"]').click();
- assert.equal(await page.locator('.performance-kpi').count(),5);
+ assert.equal(await page.locator('.performance-kpi').count(),7);
  assert.equal(await page.locator('.okr-card').count(),2);
  assert.ok((await page.locator('.performance-kpi').first().innerText()).includes('Riesgos críticos sin plan'));
  await page.getByRole('button',{name:'Nuevo KPI'}).click();
@@ -50,7 +50,7 @@ try{
  await page.locator('[name="target"]').fill('0');
  await page.locator('[name="owner"]').fill('Operaciones IT');
  await page.locator('#dialog-submit').click();
- assert.equal(await page.locator('.performance-kpi').count(),6);
+ assert.equal(await page.locator('.performance-kpi').count(),8);
  await page.getByRole('button',{name:'Nuevo objetivo'}).click();
  await page.locator('[name="title"]').fill('Reducir exposición de capacidad');
  await page.locator('[name="owner"]').fill('Gerencia IT');
