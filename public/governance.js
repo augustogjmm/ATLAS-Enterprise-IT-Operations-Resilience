@@ -79,7 +79,9 @@ function save(message){
 }
 function notice(message,error=false){const el=$('toast');el.textContent=message;el.className='toast show'+(error?' error':'');clearTimeout(toastTimeout);toastTimeout=setTimeout(()=>el.className='toast',4300)}
 function overview(){
- const ts=today(), x=executiveSummary(state,ts);
+ const ts=today(), x=executiveSummary(state,ts), itsm=incidentMetrics(state,ts);
+ const itsmSignal=itsm.total?{level:itsm.criticalOpen?'critical':itsm.open?'warning':'ok',label:itsm.criticalOpen?'Crítico':itsm.open?'Atención':'En control',reason:itsm.criticalOpen+' incidentes P1/P2 pendientes; '+itsm.open+' abiertos en total.'}:{level:'unknown',label:'Sin evaluar',reason:'No hay incidentes registrados.'};
+ const combined=worstSignal([x.status,itsmSignal]);
  const untreated=state.risks.filter(r=>r.status==='abierto'&&riskSignal(r,state.actions,ts).level==='critical')
    .sort((a,b)=>severity(b).score-severity(a).score).slice(0,4);
  const due=state.actions.filter(a=>a.status!=='completada')
@@ -89,7 +91,8 @@ function overview(){
   ['Capacity',worstSignal([...state.capacities.map(infrastructureSignal),...state.teamCapacities.map(workforceSignal)]),x.capacityAlerts+x.teamAlerts+' alertas','capacity'],
   ['Continuidad',worstSignal(state.services.filter(s=>Number(s.criticality)===1).map(s=>serviceSignal(s,ts))),x.criticalServices+' servicios críticos','continuity'],
   ['Ejecución',worstSignal(state.actions.filter(a=>a.status!=='completada').map(a=>actionSignal(a,ts))),x.overdue+' vencidas','actions'],
-  ['Assessments',worstSignal(state.assessments.map(assessmentSignal)),x.lowAssessments+' brechas','assessments']
+  ['Assessments',worstSignal(state.assessments.map(assessmentSignal)),x.lowAssessments+' brechas','assessments'],
+  ['Incidentes',itsmSignal,itsm.open+' abiertos · '+itsm.criticalOpen+' P1/P2','incidents']
  ];
  const financeSignal=x.pendingDecisions?{level:'warning',label:'Atención',reason:'Existen decisiones abiertas para comité.'}:{level:state.decisions.length?'ok':'unknown',label:state.decisions.length?'En control':'Sin evaluar',reason:'Sin decisiones pendientes registradas.'};
  const riskCritical=x.criticalUnmanaged?{level:'critical',label:'Crítico',reason:'Hay riesgos críticos sin tratamiento'}:{level:x.unmanaged?'warning':x.activeRisks?'ok':'unknown',label:x.unmanaged?'Atención':x.activeRisks?'En control':'Sin evaluar',reason:'Cobertura de tratamiento registrada'};
@@ -106,11 +109,11 @@ function overview(){
    const acts=worstSignal(due.map(a=>actionSignal(a,ts)));
    return '<tr><td><div class="executive-table-title">'+esc(v.name)+'</div><div class="executive-table-meta">'+esc(v.owner)+'</div></td><td>'+semaphore(signal)+'</td><td><span class="mono-n">'+count+'</span> abiertos</td><td>'+semaphore(cap)+'</td><td>'+semaphore(cont)+'</td><td>'+semaphore(acts)+'</td></tr>';
  }).join('');
- return `<section class="executive-summary signal-border-${x.status.level}" aria-label="Síntesis ejecutiva">
+ return `<section class="executive-summary signal-border-${combined.level}" aria-label="Síntesis ejecutiva">
   <div class="executive-summary-upper">
     <div><span class="executive-overline">EXECUTIVE SITUATION REPORT / ${esc(ts)}</span>
       <h2>Estado de la operación <span class="executive-status-mark">${semaphore(x.status)}</span></h2>
-      <p class="executive-summary-text">${esc(x.sentence)}</p>
+      <p class="executive-summary-text">${esc(x.sentence)} ${itsm.criticalOpen?esc("Atender "+itsm.criticalOpen+" incidente(s) crítico(s) P1/P2 pendiente(s) de resolución."): ""}</p>
       <div class="summary-footnotes"><span>Indicadores derivados de ${state.verticals.length} verticales y ${state.services.length} servicios</span><span>Datos del navegador · No es telemetría en vivo</span></div>
     </div>
     <div class="summary-aside"><div class="summary-aside-header">FRENTE DE DECISIONES</div><div class="summary-aside-value">${x.pendingDecisions}</div><span>Temas pendientes de comité</span><div class="summary-aside-bottom">${semaphore(financeSignal)} ${mini('Ver comité ↗','view:committee','','secondary')}</div></div>
@@ -355,7 +358,16 @@ function openForm(type,id=''){
   seedDemoPerformance(state);addEvent(state,'okr','Se agregaron KPI y OKR de demostración sin modificar los registros operativos.',today());save('KPI y OKR de ejemplo agregados.');return;
  }
  const v=vertOptions(),r=riskOptions();let title,description='',fields='',submit='Guardar registro';
- if(type==='kpi'){title='Nuevo KPI tecnológico';description='Indicadores corporativos calculados automáticamente a partir de registros de ATLAS; elegí la fórmula y la meta.';fields=select('metric','Indicador y fórmula',KPI_OPTIONS)+input('name','Nombre ejecutivo del KPI','text','',{required:true,wide:true})+input('target','Meta','number','',{required:true,step:'any'})+input('owner','Responsable de seguimiento','text','',{required:true});}
+ if(type==='incident-close'){
+   const incident=state.incidents.find(x=>x.id===id);
+   if(!incident||incident.resolvedAt!==null)return notice('No se puede cerrar este incidente.',true);
+   title='Registrar resolución de incidente';
+   description='Ingresá la fecha/hora de recuperación como ISO 8601 con zona horaria. La duración se calculará automáticamente.';
+   fields='<div class="modal-note">'+esc(incident.id)+' · '+esc(incident.summary)+'</div>'+
+    input('resolvedAt','Resolución ISO con zona (ej. 2026-11-18T12:00:00-03:00)','text','',{required:true,wide:true});
+   submit='Registrar cierre';
+ }
+ else if(type==='kpi'){title='Nuevo KPI tecnológico';description='Indicadores corporativos calculados automáticamente a partir de registros de ATLAS; elegí la fórmula y la meta.';fields=select('metric','Indicador y fórmula',KPI_OPTIONS)+input('name','Nombre ejecutivo del KPI','text','',{required:true,wide:true})+input('target','Meta','number','',{required:true,step:'any'})+input('owner','Responsable de seguimiento','text','',{required:true});}
  else if(type==='okr'){title='Nuevo objetivo tecnológico';description='El objetivo se mide mediante resultados clave vinculados a los KPI disponibles.';fields=input('title','Objetivo estratégico','text','',{required:true,wide:true})+input('owner','Responsable del objetivo','text','',{required:true})+select('verticalId','Alcance',[['','Corporativo'],...vertOptions()])+input('startDate','Inicio','date',today(),{required:true})+input('dueDate','Fecha objetivo','date','',{required:true});}
  else if(type==='kr'){title='Vincular resultado clave';description='El KR evoluciona automáticamente al cambiar los registros que alimentan el KPI. Definí una línea base y una meta de mejora.';const available=state.objectives.filter(o=>o.status==='activo');if(!available.length||!state.kpis.length)return notice('Primero registrá un objetivo activo y al menos un KPI.',true);fields=select('objectiveId','Objetivo',available.map(o=>[o.id,o.title]),id)+select('kpiId','Indicador medido',state.kpis.map(k=>[k.id,k.name]))+input('baseline','Línea base','number','',{required:true,step:'any'})+input('target','Meta del resultado clave','number','',{required:true,step:'any'});}
  else if(type==='okr-close'){const obj=state.objectives.find(o=>o.id===id);if(!obj)return notice('Objetivo inexistente.',true);title='Cerrar objetivo tecnológico';description='Se congelarán los resultados y el avance en la fecha de cierre. El cierre no implica necesariamente que se alcanzó la meta.';fields='<div class="modal-note">'+esc(obj.title)+'</div>'+textarea('evidence','Evidencia o acta del cierre');submit='Registrar cierre';}
@@ -382,7 +394,11 @@ function textRequired(v,label){if(!v||!String(v).trim())throw new Error('Indicá
 function submitRecord(data){
  const type=modal.type,id=modal.id,ts=today();
  const req=(k,label)=>textRequired(data[k],label);
- if(type==='kpi'){addKpi(state,{...data,name:req('name','nombre del KPI'),owner:req('owner','responsable')},idFactory);addEvent(state,'kpi','Nuevo KPI tecnológico registrado: '+data.name,ts);}
+ if(type==='incident-close'){
+   const record=resolveIncident(state,id,req('resolvedAt','fecha de resolución'));
+   addEvent(state,'incident','Incidente '+record.id+' cerrado con resolución registrada.',ts);
+ }
+ else if(type==='kpi'){addKpi(state,{...data,name:req('name','nombre del KPI'),owner:req('owner','responsable')},idFactory);addEvent(state,'kpi','Nuevo KPI tecnológico registrado: '+data.name,ts);}
  else if(type==='okr'){addObjective(state,{...data,title:req('title','objetivo'),owner:req('owner','responsable')},idFactory);addEvent(state,'okr','Objetivo creado: '+data.title,ts);}
  else if(type==='kr'){addKeyResult(state,data,idFactory);addEvent(state,'okr','Resultado clave vinculado a un KPI',ts);}
  else if(type==='okr-close'){closeObjective(state,id,ts,req('evidence','evidencia de cierre'));addEvent(state,'okr','Objetivo cerrado con evidencia',ts);}
