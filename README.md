@@ -1,65 +1,85 @@
-# ATLAS — Enterprise IT Operations & Resilience
-### Centro Ejecutivo de Operaciones y Continuidad Tecnológica
+# ATLAS — IT Governance & Operations Management
 
-**Arquitectura empresarial · Operaciones de TI · Continuidad operativa · Gobierno tecnológico**
+### De la observación a la ejecución: capacidad, assessments, riesgos, acciones y continuidad
 
-> Proyecto personal demostrativo para analizar cómo las dependencias de infraestructura impactan en los servicios de negocio, los objetivos de recuperación y las decisiones de inversión. **Todos los datos, incidentes, costos y componentes son ficticios**. No representa sistemas de un empleador, telemetría real ni una solución de Disaster Recovery validada.
+**ATLAS** es un proyecto personal demostrativo para roles de Head of IT, Gerencia de Infraestructura, Operaciones Tecnológicas y Arquitectura Empresarial. El propósito es mostrar cómo se organiza el **gobierno de tecnología basado en registros, responsables, prioridades y evidencias**, no solamente indicadores visuales.
 
-**Autor:** Augusto García Juárez Matorras · [LinkedIn](https://www.linkedin.com/in/augustog/) · [Perfil profesional](https://github.com/augustogjmm)
+> **Versión funcional V1:** plataforma estática, con operaciones reales sobre datos almacenados en **el navegador del usuario**. El contenido de inicio es 100% ficticio, identificado como demostración. No monitorea infraestructura ni conecta servicios productivos. No utiliza todavía D1 ni autenticación multiusuario.
 
-## ¿Qué problema aborda?
+## ¿Qué podés hacer?
 
-Las herramientas de monitoreo permiten detectar fallas. En los niveles de conducción tecnológica también necesitamos responder: **¿qué servicios de negocio están comprometidos, qué tan preparada está la organización para recuperarlos y qué decisiones de inversión pueden modificar ese riesgo?**
-
-ATLAS propone un entorno de simulación reproducible para conversar sobre esas decisiones con criterio de arquitectura, operaciones y continuidad.
-
-## Alcance del MVP
-
-| Módulo | Capacidades demostradas |
+| Área | Operaciones disponibles |
 |---|---|
-| Arquitectura empresarial | Topología ficticia de dos data centers y una integración cloud |
-| Servicios de negocio | Seis servicios con criticidad, responsables y rutas alternativas de dependencia |
-| Gestión de incidentes | Caída del DC principal/secundario, interrupción cloud, falla correlacionada de redes y retraso de replicación |
-| Continuidad operativa | Evaluación de tiempos estimados de recuperación y pérdida de datos frente a objetivos RTO/RPO |
-| Decisiones ejecutivas | Alternativas de respuesta y comparación ilustrativa de CAPEX/OPEX |
-| Evidencia | Exportación local de resultados, supuestos e impacto por servicio en formato JSON |
+| **Verticales y equipos** | Registrar unidades de gestión con responsables y ámbitos, comparar madurez y exposición. |
+| **Capacity tecnológico** | Registrar consumo/total por recurso, umbrales y tasa de crecimiento; calcular utilización y proyección a tres meses. Una medición sobre el umbral genera un riesgo vinculado. |
+| **Capacity de equipos** | Registrar FTE disponibles/asignados, cobertura operativa, brechas de reemplazo o habilidades. Sobrecarga o cobertura baja dispara un riesgo. No se evalúa desempeño individual. |
+| **Assessments** | Registrar dimensiones, puntuación 1 a 5, hallazgos, responsables y evidencia. Calificación 1 o 2 crea un riesgo automáticamente. |
+| **Riesgos** | Registrar probabilidad, impacto y exposición; identificar riesgos sin plan y vincularlos con assessments, capacidades o servicios. |
+| **Planes de acción** | Asignar compromisos a riesgos, responsable, fecha objetivo y evidencia. Solo permite completar una acción con evidencia y validar mitigación después de cerrar todas las acciones vinculadas. |
+| **Continuidad / disponibilidad** | Administrar servicios, criticidad, objetivo SLA, minutos observados de caída, resultado y evidencia de ejercicios DR, objetivos RTO/RPO. |
+| **Comité de Tecnología** | Registrar decisiones, responsables, fecha, riesgo asociado y constancia de resolución. |
+| **Centro ejecutivo** | Calcular automáticamente riesgos críticos sin plan, acciones vencidas, servicios críticos con DR sin validar y alertas de capacidad. |
+| **Respaldo** | Exportar / importar el estado como JSON y comenzar desde datos de prueba o un espacio vacío. |
 
-**Importante:** los tiempos y el índice de riesgo son supuestos pedagógicos, no mediciones reales, probabilidades predictivas ni garantías de disponibilidad.
+## Circuito funcional que demuestra el proyecto
 
-### Principios de diseño
+1. **Assessment:** registrar un hallazgo en una vertical con puntuación de madurez baja.
+2. **Riesgo:** ATLAS crea automáticamente un riesgo vinculado, inicialmente **sin plan**.
+3. **Plan de acción:** definir responsable y fecha. El riesgo pasa a **con plan**.
+4. **Ejecución:** completar la acción aportando evidencia.
+5. **Cierre:** validar la mitigación del riesgo con evidencia independiente.
+6. **Indicadores:** la situación ejecutiva se actualiza a partir de los registros y sus relaciones.
 
-- **Explicabilidad antes que complejidad.** Cada resultado responde a hipótesis documentadas.
-- **Prioridad del negocio.** Las dependencias técnicas se evalúan en función de los servicios que soportan.
-- **Redundancia no significa continuidad garantizada.** Una ruta de contingencia puede resultar insuficiente para el RTO.
-- **Decisiones con criterios de gobierno.** Las intervenciones muestran efectos potenciales, costos y límites.
-- **Sin información confidencial.** Los escenarios no reproducen infraestructura ni eventos de empleadores.
+La segunda automatización vincula **mediciones de capacity sobre el umbral** con riesgos. La puntuación de exposición resulta de **probabilidad × impacto**, no de un modelo probabilístico.
 
-## Cómo ejecutarlo
+## Ejecución local
 
-Se recomienda Node.js 22 o superior. El proyecto no necesita instalar paquetes ni utilizar una cuenta cloud para la demo local.
+Requiere Node.js 22 o posterior, sin instalar dependencias para el build.
 
 ```bash
 npm run check
 npm test
 npm run build
-```
-
-Para levantar el directorio generado `dist/` mediante un servidor HTTP local:
-
-```bash
 python -m http.server 8080 --directory dist
 ```
 
-Abrí [http://localhost:8080](http://localhost:8080). No abras directamente el archivo `index.html` con `file://`, porque los navegadores restringen las importaciones de módulos.
+Abrir `http://localhost:8080`. La aplicación principal es **ATLAS Governance**. El simulador anterior de resiliencia permanece disponible en `/simulador.html`, separado del flujo de gestión.
 
-## Publicación en Cloudflare
+La CI incorpora pruebas automatizadas del dominio y pruebas en Chromium que cubren formularios, reglas de negocio, trazabilidad, persistencia, exportación y móvil.
 
-La salida `dist/` es estática y está diseñada para alojarse mediante **Cloudflare Workers Static Assets**, evitando dependencias con Vercel. Todavía no se declara un despliegue público: antes deben completarse las pruebas visuales y comprobarse la configuración y los límites gratuitos de Cloudflare.
+## Arquitectura
 
-Más información: [arquitectura y reglas de decisión](docs/ARCHITECTURE.md), [ADR-001](docs/ADR-001-static-simulation.md) y [guía de demostración para entrevistas](docs/DEMO_GUIDE.md).
+```text
+Navegador / ATLAS Governance
+  ├── public/index.html          -> experiencia de gobierno
+  ├── public/governance.css      -> presentación responsive
+  ├── public/governance.js       -> formularios, gestión, respaldos
+  ├── src/governance/core.js     -> motor de dominio determinista
+  └── localStorage              -> persistencia por navegador
 
-## Alcance y seguridad
+Simulador conceptual anterior
+  ├── public/simulador.html
+  ├── public/app.js
+  └── src/engine.js + src/data.js
+```
 
-No se conectan sistemas de empresas, usuarios ni claves. La simulación se ejecuta en el navegador, sin almacenamiento de datos operativos ni consultas a APIs externas. ATLAS es un **MVP demostrativo**, no una CMDB, plataforma ITSM ni herramienta certificada de monitoreo.
+El build copia `public/` y `src/` a `dist/`, preparado para **Cloudflare Workers Static Assets** sin backend dinámico, secretos ni pago obligatorio.
 
-Consultá [SECURITY.md](SECURITY.md). La licencia general de reutilización todavía no fue definida.
+## Seguridad y límites de uso
+
+**Persistencia real, pero local y de un solo navegador:** los registros pueden modificarse, mantenerse tras recargar y exportarse/importarse. **No son datos compartidos ni sincronizados en la nube**. Si se borra el almacenamiento del navegador o se utiliza otro dispositivo, los registros no estarán disponibles sin importar un respaldo. No hay autenticación, permisos, auditoría independiente o acceso multiusuario.
+
+**No cargar información empresarial confidencial ni datos personales.** Este entorno público está concebido como demostración. Los datos iniciales son ficticios; si el usuario introduce información propia, la aplicación no puede verificarla automáticamente.
+
+La siguiente evolución prevista es D1 + autenticación + control por roles, previo diseño de seguridad y validación de cuotas del plan gratuito. También quedan pendientes los OKR con resultados clave, importación de incidentes CSV y conectores de fuentes reales; **no se declaran implementados**.
+
+## Documentación
+
+- [Modelo y criterios del primer circuito funcional](docs/GOBIERNO_FUNCIONAL_V1.md)
+- [Simulador de resiliencia y su arquitectura](docs/ARCHITECTURE.md)
+- [Guía de Cloudflare](docs/DESPLIEGUE_CLOUDFLARE.md)
+- [Seguridad](SECURITY.md)
+
+**Autor:** Augusto García Juárez Matorras · [LinkedIn](https://www.linkedin.com/in/augustog/)
+
+No se ha asignado aún una licencia general de reutilización.
