@@ -72,6 +72,8 @@ test('se pueden crear nuevos KPI, objetivos y resultados clave, validando metas'
  assert.doesNotThrow(()=>validatePerformanceState(s));
  assert.throws(()=>addKeyResult(s,{objectiveId:o.id,kpiId:k.id,baseline:4,target:1},uid),/meta debe mejorar/);
  assert.throws(()=>addKpi(s,{name:'Métrica',metric:'inventada',target:0,owner:'IT'},uid),/KPI/);
+ assert.throws(()=>addKpi(s,{name:'KPI sin meta',metric:'overdue_actions',target:'',owner:'IT'},uid),/meta numérica/);
+ assert.throws(()=>addKeyResult(s,{objectiveId:o.id,kpiId:k.id,baseline:'',target:4},uid),/línea base/);
  assert.throws(()=>addObjective(s,{title:'Fechas inválidas',owner:'IT',startDate:'2027-01-01',dueDate:'2026-01-01'},uid),/Objetivo/);
 });
 
