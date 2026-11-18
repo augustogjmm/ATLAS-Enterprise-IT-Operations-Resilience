@@ -55,7 +55,7 @@ try{
  const riskRow=page.locator('tr').filter({hasText:'Brecha de Seguridad'});
  assert.equal(await riskRow.count(),1);
  assert.ok((await riskRow.innerText()).includes('Sin plan'));
- assert.ok(await riskRow.locator('.signal-chip.signal-critical').count()>0);
+ assert.ok(await riskRow.locator('.signal-chip.signal-warning').count()>0); // Riesgo 3×4 = 12, nivel alto (no crítico)
 
  // Riesgo -> plan con responsable y plazo
  await riskRow.getByRole('button',{name:'Crear plan'}).click();
