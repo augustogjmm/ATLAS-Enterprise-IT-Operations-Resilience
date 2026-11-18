@@ -1,10 +1,10 @@
-# Responsible security posture
+# Seguridad y tratamiento de información
 
-ATLAS is an open-source-code demonstration using synthetic inputs. It does not connect to enterprise systems or contain account, provider or employee data.
+ATLAS es un proyecto demostrativo de código público, con datos ficticios. No se conecta a entornos corporativos ni almacena información de clientes, colaboradores o cuentas reales.
 
-- Do not submit secrets, employer topology, access credentials or personal information in public issues.
-- If a problem may expose private data, contact the project owner privately through the LinkedIn profile linked from the README before sharing technical details.
-- Avoid introducing external providers or dependencies without documenting why they are needed.
-- Do not use its simulated availability, cost or disaster recovery figures as live evidence or advice.
+- No publicar contraseñas, tokens, topologías de empleadores ni datos personales en incidencias públicas.
+- Para reportar un posible problema sensible, comunicarse de forma privada con el responsable a través del perfil de LinkedIn indicado en el README antes de revelar detalles técnicos.
+- Evitar proveedores y dependencias externas sin justificar su necesidad.
+- No utilizar sus valores simulados de disponibilidad, costos o recuperación como evidencias reales ni como asesoramiento profesional específico.
 
-No formal security assessment or response SLA is implied.
+El proyecto no implica una auditoría formal de seguridad ni compromete tiempos de respuesta.
