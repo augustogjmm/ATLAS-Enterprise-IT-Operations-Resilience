@@ -1,0 +1,43 @@
+name: ATLAS · Calidad y reproducibilidad
+on:
+  push:
+    branches: [main, feature/**]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verificación de sintaxis
+        run: npm run check
+      - name: Pruebas del motor de simulación
+        run: npm test
+      - name: Construcción del sitio estático
+        run: npm run build
+      - name: Verificación de archivos generados
+        run: |
+          test -f dist/index.html
+          test -f dist/app.js
+          test -f dist/lib/data.js
+          test -f dist/lib/engine.js
+      - name: Instalar navegador para pruebas funcionales
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Probar interfaz, escenarios y exportación en Chromium
+        run: node scripts/browser-smoke.mjs
+      - name: Guardar capturas de pantalla de revisión
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-capturas-escritorio-movil
+          path: test-artifacts/
+          if-no-files-found: ignore
+          retention-days: 7
+      # Sin credenciales, APIs productivas ni despliegue. Instalación de Playwright solo en CI.

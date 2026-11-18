@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0a1020">
+  <meta name="description" content="ATLAS es un centro de decisiones para arquitectura empresarial, operaciones de TI y continuidad de servicios, con datos de demostración ficticios.">
+  <title>ATLAS | Operaciones y Resiliencia de TI</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <div class="workspace">
+    <aside class="sidebar" aria-label="Navegación principal">
+      <a class="brand" href="#overview" aria-label="Inicio de ATLAS">
+        <span class="brand-symbol" aria-hidden="true">A<span class="brand-dot">·</span></span>
+        <span><strong>ATLAS</strong><small>TECNOLOGÍA EMPRESARIAL</small></span>
+      </a>
+      <div class="sidebar-section-title">ESPACIO EJECUTIVO</div>
+      <nav class="nav-group" aria-label="Secciones del tablero">
+        <a href="#overview" class="nav-link active"><span class="nav-icon">◫</span> Centro de decisiones</a>
+        <a href="#architecture" class="nav-link"><span class="nav-icon">◇</span> Arquitectura empresarial</a>
+        <a href="#services" class="nav-link"><span class="nav-icon">▤</span> Servicios de negocio</a>
+        <a href="#decisions" class="nav-link"><span class="nav-icon">⌁</span> Decisiones de inversión</a>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="sidebar-info"><span class="status-light"></span> ENTORNO DE SIMULACIÓN</div>
+        <div class="sidebar-note">Demostración independiente de liderazgo tecnológico. Sin infraestructura real ni datos de empleadores.</div>
+        <a class="sidebar-profile" href="https://github.com/augustogjmm" target="_blank" rel="noopener noreferrer">Portafolio ejecutivo <span aria-hidden="true">↗</span></a>
+      </div>
+    </aside>
+
+    <main class="main" id="overview">
+      <header class="topbar">
+        <div class="breadcrumb">ESPACIO DE TRABAJO <span>/</span> CENTRO DE DECISIONES EJECUTIVAS</div>
+        <div class="topbar-end"><span class="snapshot">MODELO V0.1</span><span class="session-status"><span class="status-light"></span> SIMULACIÓN ACTIVA</span></div>
+      </header>
+      <div class="content">
+        <section class="hero">
+          <div class="hero-copy">
+            <div class="eyebrow">TECNOLOGÍA EMPRESARIAL OPERACIONES <span class="eyebrow-line"></span> INTELIGENCIA DE CONTINUIDAD</div>
+            <h1>Convertí la resiliencia en <em>decisiones,</em><br>no solo indicadores.</h1>
+            <p>Relacioná las dependencias de infraestructura con el impacto en los servicios de negocio, los objetivos de recuperación y las decisiones de inversión.</p>
+            <div class="hero-tags"><span>ARQUITECTURA</span><span>CONTINUIDAD OPERATIVA</span><span>GOBIERNO DE TI</span></div>
+          </div>
+          <div class="hero-mark" aria-hidden="true">
+            <div class="orb orb-one"></div><div class="orb orb-two"></div>
+            <div class="orb-center">A<span>·</span></div>
+            <div class="orbit-label orbit-top">OPERACIONES</div><div class="orbit-label orbit-bottom">RESILIENCIA</div>
+          </div>
+        </section>
+
+        <section class="simulation-strip" aria-label="Controles de simulación">
+          <div class="simulation-heading"><div class="kicker">01 / SIMULADOR DE ESCENARIOS</div><h2>Simulación de incidentes críticos</h2><p>Seleccioná un incidente y evaluá su impacto potencial.</p></div>
+          <div class="control">
+            <label for="scenario-select">ESCENARIO DE FALLA</label>
+            <select id="scenario-select" aria-label="Escenario de falla"></select>
+          </div>
+          <div class="control">
+            <label for="intervention-select">RESPUESTA DE GESTIÓN</label>
+            <select id="intervention-select" aria-label="Respuesta de gestión"></select>
+          </div>
+          <button class="export-btn" id="export-btn" type="button" title="Exportar los resultados del escenario como JSON">Exportar evaluación <span aria-hidden="true">↗</span></button>
+        </section>
+
+        <section class="metrics-grid" aria-label="Resumen operativo">
+          <article class="metric-card"><div class="metric-top"><span>SERVICIOS EVALUADOS</span><span class="metric-symbol">◈</span></div><strong id="metric-services">—</strong><div class="metric-foot"><span>Servicios incluidos en el modelo</span><span class="metric-mini">EN ALCANCE</span></div></article>
+          <article class="metric-card"><div class="metric-top"><span>SERVICIOS AFECTADOS</span><span class="metric-symbol">↘</span></div><strong id="metric-affected">—</strong><div class="metric-foot"><span>Caída o recuperación por contingencia</span><span id="impact-tag" class="metric-mini">—</span></div></article>
+          <article class="metric-card"><div class="metric-top"><span>OBJETIVOS RTO / RPO INCUMPLIDOS</span><span class="metric-symbol">◷</span></div><strong id="metric-breaches">—</strong><div class="metric-foot"><span>Objetivos excedidos en el escenario</span><span id="breach-tag" class="metric-mini">—</span></div></article>
+          <article class="metric-card accent-card"><div class="metric-top"><span>ÍNDICE DE RIESGO DEL ESCENARIO</span><span class="metric-symbol">⌁</span></div><div class="metric-risk"><strong id="metric-risk">—</strong><span>/ 100</span></div><div class="risk-track" aria-label="Índice de riesgo simulado"><span id="risk-fill"></span></div><div class="metric-foot"><span>Puntaje orientativo ponderado</span><span>NO ES UNA CALIFICACIÓN</span></div></article>
+        </section>
+
+        <section class="scenario-narrative" aria-live="polite">
+          <div class="narrative-symbol">i</div>
+          <div><strong id="scenario-label">Cargando escenario…</strong><p id="scenario-description">Evaluando los datos de simulación.</p></div>
+          <div class="narrative-state" id="scenario-category">MODELO</div>
+        </section>
+
+        <section class="two-column" id="architecture">
+          <article class="panel architecture-panel">
+            <div class="panel-heading"><div><div class="kicker">02 / VISIBILIDAD DE ARQUITECTURA</div><h2>Mapa de dependencias de infraestructura</h2><p>Componentes por ubicación. Una falla puede afectar varios servicios de negocio.</p></div><span class="panel-tag">TOPOLOGÍA FICTICIA</span></div>
+            <div class="topology" id="topology" aria-label="Topología de infraestructura"></div>
+            <div class="legend"><span><i class="legend-dot healthy"></i> Disponible</span><span><i class="legend-dot failed"></i> En falla</span><span><i class="legend-dot exposed"></i> Redundancia reducida</span></div>
+          </article>
+          <article class="panel priorities-panel">
+            <div class="panel-heading"><div><div class="kicker">03 / INDICADORES EJECUTIVOS</div><h2>Riesgo y capacidad de recuperación</h2><p>Aspectos que requieren decisiones de gestión.</p></div></div>
+            <div class="posture-row"><span class="posture-icon">01</span><div><div class="posture-label">Interrupción de servicios críticos</div><div class="posture-value" id="posture-critical">—</div></div></div>
+            <div class="posture-row"><span class="posture-icon">02</span><div><div class="posture-label">Redundancia de recuperación reducida</div><div class="posture-value" id="posture-redundancy">—</div></div></div>
+            <div class="posture-row"><span class="posture-icon">03</span><div><div class="posture-label">Evaluación de prioridades</div><div class="posture-value" id="posture-decision">—</div></div></div>
+            <div class="posture-note"><strong>Alcance del modelo</strong><p>Las rutas alternativas son supuestos del modelo, no evidencia de un DR probado ni de disponibilidad real.</p></div>
+          </article>
+        </section>
+
+        <section class="panel service-panel" id="services">
+          <div class="panel-heading"><div><div class="kicker">04 / CONTINUIDAD DE SERVICIOS DE NEGOCIO</div><h2>Evaluación de objetivos de recuperación</h2><p>Comparación de RTO y RPO por servicio de negocio.</p></div><span class="panel-tag">6 SERVICIOS DE NEGOCIO</span></div>
+          <div class="table-scroll">
+            <table>
+              <thead><tr><th scope="col">SERVICIO DE NEGOCIO</th><th scope="col">CRITICIDAD</th><th scope="col">ESTADO DEL SERVICIO</th><th scope="col">RECUPERACIÓN / RTO</th><th scope="col">PÉRDIDA DE DATOS / RPO</th></tr></thead>
+              <tbody id="service-rows"></tbody>
+            </table>
+          </div>
+          <div class="table-footer"><span>RTO = tiempo máximo de recuperación; RPO = pérdida de datos máxima aceptable.</span><span>Todos los valores son supuestos ficticios.</span></div>
+        </section>
+
+        <section class="decision-grid" id="decisions">
+          <article class="panel">
+            <div class="panel-heading"><div><div class="kicker">05 / EVALUACIÓN DE DECISIONES</div><h2>Análisis de inversión</h2><p>Compará una alternativa de gestión con la situación original para el mismo incidente.</p></div></div>
+            <div class="investment-name" id="investment-name">—</div><p class="investment-rationale" id="investment-rationale">—</p>
+            <div class="comparison-grid">
+              <div><span>CAMBIO DEL ÍNDICE DE RIESGO</span><strong id="comparison-risk">—</strong><small>puntos de mejora</small></div>
+              <div><span>INCUMPLIMIENTOS EVITADOS</span><strong id="comparison-breaches">—</strong><small>objetivos simulados de servicio</small></div>
+            </div>
+            <div class="decision-caveat">Una mejora simulada no constituye una justificación de compra ni acredita una mejora real del servicio.</div>
+          </article>
+          <article class="panel finance-panel">
+            <div class="panel-heading"><div><div class="kicker">06 / GOBIERNO TECNOLÓGICO</div><h2>Perspectiva presupuestaria</h2><p>Presupuesto anual ilustrativo más la intervención seleccionada.</p></div></div>
+            <div class="money-row"><span>Gasto operativo anual (OPEX)</span><strong id="budget-opex">—</strong></div>
+            <div class="money-bar"><div id="opex-bar" class="money-fill"></div></div>
+            <div class="money-row"><span>Presupuesto de inversión (CAPEX)</span><strong id="budget-capex">—</strong></div>
+            <div class="money-bar"><div id="capex-bar" class="money-fill second"></div></div>
+            <div class="budget-foot" id="budget-change">—</div>
+          </article>
+        </section>
+
+        <footer class="footer"><span><strong>ATLAS</strong> / Operaciones y Resiliencia de TI</span><span>Demostración ejecutiva · Datos ficticios · Sin conexiones a sistemas reales</span><a href="https://github.com/augustogjmm/ATLAS-Enterprise-IT-Operations-Resilience" target="_blank" rel="noopener noreferrer">Código y metodología ↗</a></footer>
+      </div>
+    </main>
+  </div>
+  <div class="sr-only" id="live-region" role="status" aria-live="polite"></div>
+</body>
+</html>
