@@ -72,10 +72,11 @@ function save(message){
   assertValidState(state);
   validatePerformanceState(state);
   validateIncidentState(state);
-  try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));storageOK=true;}
+  let persisted=false;
+  try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));storageOK=true;persisted=true;}
   catch(err){storageOK=false;notice('No se pudo guardar. Exportá un respaldo; el navegador bloqueó el almacenamiento.',true)}
   render();
-  if(message)notice(message);
+  if(message&&persisted)notice(message);
 }
 function notice(message,error=false){const el=$('toast');el.textContent=message;el.className='toast show'+(error?' error':'');clearTimeout(toastTimeout);toastTimeout=setTimeout(()=>el.className='toast',4300)}
 function overview(){
@@ -443,6 +444,13 @@ document.addEventListener('click',e=>{
  const nav=e.target.closest('[data-view]');if(nav){switchView(nav.dataset.view);return;}
  const item=e.target.closest('[data-open]');if(item){openForm(item.dataset.open,item.dataset.id||'');return;}
  const cmd=e.target.closest('[data-command]');if(!cmd)return;
+ if(cmd.dataset.command==='incident-sample'){
+   const objectUrl=URL.createObjectURL(new Blob(['\uFEFF'+SAMPLE_CSV],{type:'text/csv;charset=utf-8'}));
+   const link=document.createElement('a');link.href=objectUrl;link.download='atlas-incidentes-ejemplo.csv';
+   document.body.append(link);link.click();link.remove();
+   setTimeout(()=>URL.revokeObjectURL(objectUrl),1500);
+   notice('Plantilla CSV descargada. Adaptá service_id a los IDs de tu catálogo.');
+ }
  if(cmd.dataset.command==='export'){
   const content=JSON.stringify({...state,exportedAt:new Date().toISOString()},null,2);
   const objectUrl=URL.createObjectURL(new Blob([content],{type:'application/json'}));
@@ -464,6 +472,22 @@ $('record-form').addEventListener('submit',e=>{
 $('dialog-x').addEventListener('click',closeForm);
 $('dialog-cancel').addEventListener('click',closeForm);
 $('record-dialog').addEventListener('close',()=>modal=null);
+document.addEventListener('change',async event=>{
+ if(event.target?.id!=='incident-file')return;
+ const picker=event.target,file=picker.files?.[0];picker.value='';
+ if(!file)return;
+ if(file.size>512*1024)return notice('El CSV supera 512 KB. Dividilo en lotes más pequeños.',true);
+ try{
+   const rows=parseIncidentCSV(await file.text(),state);
+   const ids=new Map(state.incidents.map(x=>[x.id,x]));
+   const newCount=rows.filter(r=>!ids.has(r.id)).length;
+   const candidateUpdates=rows.filter(r=>ids.has(r.id)&&ids.get(r.id).resolvedAt===null&&r.resolvedAt!==null).length;
+   if(!confirm('Importación local: '+rows.length+' fila(s). Nuevos: '+newCount+'. Posibles resoluciones de abiertos: '+candidateUpdates+'. Los IDs repetidos sin cambios se omiten. ¿Validar y aplicar todo el lote?'))return;
+   const outcome=importIncidents(state,rows);
+   addEvent(state,'incident','Importación CSV: '+outcome.inserted+' nuevo(s), '+outcome.updated+' cierre(s) actualizado(s), '+outcome.unchanged+' sin cambios.',today());
+   save('Importados '+outcome.inserted+' nuevo(s), '+outcome.updated+' actualizado(s), '+outcome.unchanged+' existentes.');
+ }catch(err){notice('CSV rechazado sin aplicar cambios: '+(err.message||'Error de importación.'),true)}
+});
 $('import-file').addEventListener('change',async e=>{
  const file=e.target.files?.[0];e.target.value='';if(!file)return;
  if(file.size>1024*1024)return notice('El archivo supera 1 MB.',true);
