@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createDemo,makeEmpty,assertValidState,dashboard,capacityStatus,availability,severity,riskTreatment,
-  registerAssessment,registerCapacity,registerAction,completeAction,validateRisk,actionOverdue
+  registerAssessment,registerCapacity,registerTeamCapacity,teamStatus,registerAction,completeAction,validateRisk,actionOverdue
 } from '../src/governance/core.js';
 const date='2026-11-18';
 let next=0;
@@ -92,4 +92,15 @@ test('validaciones de registros impiden mediciones imposibles',()=>{
  assert.throws(()=>registerCapacity(s,{verticalId:'v-cloud',name:'Error',used:1,total:0,thresholdPct:80,growthPct:1,unit:'TB'},date,uid),/capacidad/);
  assert.throws(()=>registerAssessment(s,{verticalId:'v-cloud',domain:'Gobierno',score:8,finding:'Hallazgo',owner:'Equipo'},date,uid),/madurez/);
  assert.throws(()=>registerAction(s,{riskId:'no-existe',title:'Plan',owner:'Equipo',dueDate:date},date,uid),/riesgo/);
+});
+
+test('capacity de equipos: carga, cobertura, y generación de riesgo',()=>{
+ const s=createDemo();
+ assert.equal(s.teamCapacities.length,4);
+ const normal=teamStatus({availableFte:10,allocatedFte:7,coveragePct:95,thresholdPct:90});
+ assert.equal(normal.warning,false);
+ const {team,risk}=registerTeamCapacity(s,{verticalId:'v-ops',name:'Guardia de operaciones',availableFte:8,allocatedFte:9,coveragePct:75,thresholdPct:90,owner:'Operaciones',skillsGap:'Relevo de guardias'},date,uid);
+ assert.equal(risk.teamCapacityId,team.id);
+ assert.equal(riskTreatment(risk,s.actions),'Sin plan');
+ assert.equal(dashboard(s,date).teamAlerts,1);
 });
