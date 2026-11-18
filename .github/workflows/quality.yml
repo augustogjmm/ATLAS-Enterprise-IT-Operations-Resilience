@@ -53,7 +53,7 @@ jobs:
         run: node scripts/browser-smoke.mjs
       - name: Probar gobierno, riesgos, planes y persistencia en Chromium
         run: node scripts/governance-smoke.mjs
-      - name: Probar V5: sesión remota, permisos, conflictos y recuperación local
+      - name: "Probar V5: sesión remota, permisos, conflictos y recuperación local"
         run: node scripts/v5-browser-smoke.mjs
       - name: Guardar capturas de pantalla de revisión
         if: always()
