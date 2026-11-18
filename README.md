@@ -6,6 +6,16 @@
 
 > **Versión funcional V4:** plataforma estática, con operaciones reales sobre datos almacenados en **el navegador del usuario**. El contenido de inicio es 100% ficticio, identificado como demostración. No monitorea infraestructura ni conecta servicios productivos. No utiliza todavía D1 ni autenticación multiusuario.
 
+## ATLAS V5 — Evolución multiusuario en desarrollo (PR #8)
+
+> **Esta rama no es la versión publicada.** La V4 de `main` continúa pública y exclusivamente local. V5 no ha creado D1, habilitado Cloudflare Access ni activado servicios de pago.
+
+La rama V5 incorpora una API con membresías multi-tenant, roles (`owner`, `admin`, `editor`, `auditor`, `viewer`), persistencia preparada para Cloudflare D1, verificación de JWT de Access y auditoría separada. La interfaz incorpora un panel **Conectar V5** de activación voluntaria, selección de organización/workspace, lectura y guardado por revisión, exportación de cambios ante un conflicto, consulta de auditoría y gestión básica de roles.
+
+El modo local sigue siendo el predeterminado y conserva su `localStorage`. Abrir un workspace remoto **no sobrescribe los registros V4 locales**. Copiar un respaldo local al servidor exige confirmaciones expresas. Sin la configuración autenticada de Access y D1, el modo remoto falla cerrado y la V4 local permanece disponible.
+
+**Validación:** la CI ejecuta tests de negocio, identidad, RBAC, aislamiento multi-tenant y Chromium con API remota simulada; **no demuestra todavía un despliegue real con Cloudflare Access+D1**. Ver [arquitectura, controles y condiciones de activación de V5](docs/ARQUITECTURA_ATLAS_V5.md).
+
 ## ¿Qué podés hacer?
 
 | Área | Operaciones disponibles |
