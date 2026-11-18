@@ -1,40 +1,42 @@
-# ATLAS
-### Enterprise IT Operations & Resilience · Executive Technology Command Center
+# ATLAS — Enterprise IT Operations & Resilience
+### Centro Ejecutivo de Operaciones y Continuidad Tecnológica
 
-**Architecture | IT Operations | Business Continuity | Technology Governance**
+**Arquitectura empresarial · Operaciones de TI · Continuidad operativa · Gobierno tecnológico**
 
-> An interactive, reproducible **synthetic enterprise simulator** for demonstrating how infrastructure dependencies translate into recovery objectives, service risk and investment decisions. This is an independently developed portfolio project—not an employer system, not live telemetry, and not a validated disaster-recovery solution.
+> Proyecto personal demostrativo para analizar cómo las dependencias de infraestructura impactan en los servicios de negocio, los objetivos de recuperación y las decisiones de inversión. **Todos los datos, incidentes, costos y componentes son ficticios**. No representa sistemas de un empleador, telemetría real ni una solución de Disaster Recovery validada.
 
-**Owner:** Augusto García Juárez Matorras · [LinkedIn](https://www.linkedin.com/in/augustog/) · [Executive portfolio](https://github.com/augustogjmm)
+**Autor:** Augusto García Juárez Matorras · [LinkedIn](https://www.linkedin.com/in/augustog/) · [Perfil profesional](https://github.com/augustogjmm)
 
-## The executive problem
+## ¿Qué problema aborda?
 
-Dashboards report what is failing; leaders also need to understand **which business capabilities are at risk, what recovery objectives can realistically be met, and where investment changes the outcome**. ATLAS demonstrates a transparent, testable decision model for those discussions.
+Las herramientas de monitoreo permiten detectar fallas. En los niveles de conducción tecnológica también necesitamos responder: **¿qué servicios de negocio están comprometidos, qué tan preparada está la organización para recuperarlos y qué decisiones de inversión pueden modificar ese riesgo?**
 
-## Interactive MVP
+ATLAS propone un entorno de simulación reproducible para conversar sobre esas decisiones con criterio de arquitectura, operaciones y continuidad.
 
-| Capability | What you can explore |
+## Alcance del MVP
+
+| Módulo | Capacidades demostradas |
 |---|---|
-| Enterprise architecture | Synthetic primary/secondary data centers and a cloud API dependency |
-| Business service impact | Complete alternate dependency paths for six modeled services |
-| Continuity | Primary-site, secondary-site, cloud, correlated-network and data-loss disruptions |
-| Recovery objectives | Compare estimated restoration and assumed data loss against RTO/RPO |
-| Management decisions | Compare transparent recovery-time adjustments and illustrative CAPEX/OPEX |
-| Evidence | Export JSON with scenario, assumptions, per-service status and budget model |
+| Arquitectura empresarial | Topología ficticia de dos data centers y una integración cloud |
+| Servicios de negocio | Seis servicios con criticidad, responsables y rutas alternativas de dependencia |
+| Gestión de incidentes | Caída del DC principal/secundario, interrupción cloud, falla correlacionada de redes y retraso de replicación |
+| Continuidad operativa | Evaluación de tiempos estimados de recuperación y pérdida de datos frente a objetivos RTO/RPO |
+| Decisiones ejecutivas | Alternativas de respuesta y comparación ilustrativa de CAPEX/OPEX |
+| Evidencia | Exportación local de resultados, supuestos e impacto por servicio en formato JSON |
 
-**Important:** No claim of measured availability, predictive risk, security certification, financial returns, or operational recovery. The risk index is a deterministic prioritization heuristic, not a probability.
+**Importante:** los tiempos y el índice de riesgo son supuestos pedagógicos, no mediciones reales, probabilidades predictivas ni garantías de disponibilidad.
 
-### Design principles
+### Principios de diseño
 
-- **Explainability before complexity** — every derived status has an explicit underlying assumption.
-- **Business services first** — infrastructure is modeled through complete dependency chains.
-- **Resilience is not just redundancy** — an alternate path may recover too slowly to meet an RTO.
-- **Architecture is inseparable from governance** — all interventions display modeled costs and limitations.
-- **No invented employer outcomes** — infrastructure and budgets are wholly fictional.
+- **Explicabilidad antes que complejidad.** Cada resultado responde a hipótesis documentadas.
+- **Prioridad del negocio.** Las dependencias técnicas se evalúan en función de los servicios que soportan.
+- **Redundancia no significa continuidad garantizada.** Una ruta de contingencia puede resultar insuficiente para el RTO.
+- **Decisiones con criterios de gobierno.** Las intervenciones muestran efectos potenciales, costos y límites.
+- **Sin información confidencial.** Los escenarios no reproducen infraestructura ni eventos de empleadores.
 
-## Run locally
+## Cómo ejecutarlo
 
-Node.js 22 or newer is recommended; no package installation or cloud account is required.
+Se recomienda Node.js 22 o superior. El proyecto no necesita instalar paquetes ni utilizar una cuenta cloud para la demo local.
 
 ```bash
 npm run check
@@ -42,22 +44,22 @@ npm test
 npm run build
 ```
 
-Then serve the generated `dist/` directory using any static HTTP server, for example:
+Para levantar el directorio generado `dist/` mediante un servidor HTTP local:
 
 ```bash
 python -m http.server 8080 --directory dist
 ```
 
-Open [http://localhost:8080](http://localhost:8080). Do not open `index.html` directly with the `file://` protocol because browsers restrict module imports.
+Abrí [http://localhost:8080](http://localhost:8080). No abras directamente el archivo `index.html` con `file://`, porque los navegadores restringen las importaciones de módulos.
 
-## Cloudflare-first hosting
+## Publicación en Cloudflare
 
-The build output is a static asset directory (`dist/`) suitable for **Cloudflare Workers Static Assets**. We intentionally avoid Vercel-specific configuration and paid external data integrations. Hosting is **not deployed yet**; configure a Worker project and connect GitHub only after reviewing the MVP, account permissions and current Cloudflare free-plan limits.
+La salida `dist/` es estática y está diseñada para alojarse mediante **Cloudflare Workers Static Assets**, evitando dependencias con Vercel. Todavía no se declara un despliegue público: antes deben completarse las pruebas visuales y comprobarse la configuración y los límites gratuitos de Cloudflare.
 
-See the [architecture and decision model](docs/ARCHITECTURE.md), [ADR-001](docs/ADR-001-static-simulation.md) and [five-minute executive walkthrough](docs/DEMO_GUIDE.md).
+Más información: [arquitectura y reglas de decisión](docs/ARCHITECTURE.md), [ADR-001](docs/ADR-001-static-simulation.md) y [guía de demostración para entrevistas](docs/DEMO_GUIDE.md).
 
-## Safety and limitations
+## Alcance y seguridad
 
-No employer topology, customer data, credentials, API tokens or actual incidents. Simulation is browser-only with no persistent backend and no external data fetches. This repository is intentionally an **MVP**, not a CMDB, ITSM platform or real monitoring system. See [SECURITY.md](SECURITY.md).
+No se conectan sistemas de empresas, usuarios ni claves. La simulación se ejecuta en el navegador, sin almacenamiento de datos operativos ni consultas a APIs externas. ATLAS es un **MVP demostrativo**, no una CMDB, plataforma ITSM ni herramienta certificada de monitoreo.
 
-**Licensing:** No general reuse license has been assigned yet; terms should be agreed before adding a LICENSE file.
+Consultá [SECURITY.md](SECURITY.md). La licencia general de reutilización todavía no fue definida.
