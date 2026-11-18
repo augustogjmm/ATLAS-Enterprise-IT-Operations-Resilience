@@ -32,17 +32,27 @@ scenarioSelect.value = 'dc-north';
 interventionSelect.value = 'none';
 
 function drawTopology(outcome) {
-  const sites = ['DC Norte', 'DC Sur', 'Región cloud'];
+  const sites = [
+    { name: 'DC Norte', caption: 'Sitio principal', symbol: '◫' },
+    { name: 'DC Sur', caption: 'Sitio de contingencia', symbol: '◈' },
+    { name: 'Región cloud', caption: 'Servicios compartidos', symbol: '☷' }
+  ];
   const failed = new Set(outcome.scenario.failed);
+  // Visual indicators describe the synthetic scenario, not monitored infrastructure.
   const markup = sites.map(site => {
-    const nodes = COMPONENTS.filter(node => node.site === site);
+    const nodes = COMPONENTS.filter(node => node.site === site.name);
     const affected = nodes.filter(node => failed.has(node.id)).length;
-    return `<div class="site" aria-label="${site}">
-      <div class="site-title">${site}<span>${affected ? affected + ' EN FALLA' : 'NORMAL'}</span></div>
-      ${nodes.map(node => `<div class="node ${failed.has(node.id) ? 'failed' : ''}">
-        <span class="node-status" aria-hidden="true"></span>
-        <span>${node.name}</span></div>`).join('')}
-    </div>`;
+    const status = affected ? `${affected} EN FALLA` : 'DISPONIBLE';
+    return `<article class="site ${affected ? 'site-failed' : ''}" aria-label="${site.name}: ${status}">
+      <div class="site-title"><div><strong>${site.name}</strong><span class="site-subtitle">${site.caption}</span></div>
+        <span class="site-count">${status}</span></div>
+      <div class="site-nodes">
+        ${nodes.map(node => `<div class="node ${failed.has(node.id) ? 'failed' : ''}">
+          <span class="node-status" aria-hidden="true"></span>
+          <span class="node-glyph" aria-hidden="true">${site.symbol}</span>
+          <span>${node.name}</span></div>`).join('')}
+      </div>
+    </article>`;
   }).join('');
   $('topology').innerHTML = markup;
 }
@@ -93,6 +103,33 @@ function drawManagement(outcome) {
     : `Costo adicional estimado: ${money(comparison.capexDelta)} de CAPEX único + ${money(comparison.opexDelta)} de OPEX anual`;
 }
 
+function updateExecutiveBrief(outcome) {
+  const { summary, intervention } = outcome;
+  const headline = $('brief-headline');
+  const description = $('brief-description');
+  const panel = $('executive-brief');
+  if (summary.breaches > 0) {
+    headline.textContent = 'Revisar objetivos de recuperación comprometidos';
+    description.textContent = `${summary.breaches} servicio(s) exceden sus objetivos simulados. Priorizá la continuidad, la verificación de dependencias y la evidencia del procedimiento de recuperación.`;
+    panel.dataset.severity = 'high';
+  } else if (summary.affected > 0) {
+    headline.textContent = 'Validar la respuesta de contingencia';
+    description.textContent = `${summary.affected} servicio(s) requieren recuperación. Contrastá los tiempos estimados con los ensayos documentados antes de comprometer niveles de servicio.`;
+    panel.dataset.severity = 'medium';
+  } else if (summary.reducedRedundancy > 0) {
+    headline.textContent = 'El servicio continúa, la redundancia no';
+    description.textContent = 'Sin interrupciones operativas simuladas, pero con rutas de recuperación comprometidas. Priorizá la restauración de capacidad secundaria.';
+    panel.dataset.severity = 'medium';
+  } else {
+    headline.textContent = 'Mantener la preparación de continuidad';
+    description.textContent = 'Los servicios modelados operan sin incidentes simulados. Mantené ejercicios de recuperación y controles de dependencias.';
+    panel.dataset.severity = 'normal';
+  }
+  if (intervention.id !== 'none') {
+    description.textContent += ' La alternativa seleccionada modifica supuestos de recuperación, no representa una mejora ya validada.';
+  }
+}
+
 function render() {
   const scenarioId = scenarioSelect.value;
   const interventionId = interventionSelect.value;
@@ -105,6 +142,7 @@ function render() {
   $('metric-breaches').textContent = summary.breaches;
   $('metric-risk').textContent = summary.riskIndex;
   $('risk-fill').style.width = `${summary.riskIndex}%`;
+  document.querySelector('.accent-card')?.style.setProperty('--risk-angle', `${summary.riskIndex * 3.6}deg`);
   $('impact-tag').textContent = summary.affected ? 'REQUIERE ACCIÓN' : 'SIN INTERRUPCIONES';
   $('breach-tag').textContent = summary.breaches ? 'REVISAR PRIORIDAD' : 'OBJETIVOS CUMPLIDOS';
   $('scenario-label').textContent = scenario.label;
@@ -116,6 +154,7 @@ function render() {
   drawTopology(outcome);
   drawServices(outcome);
   drawManagement(outcome);
+  updateExecutiveBrief(outcome);
 }
 
 function exportAssessment() {
