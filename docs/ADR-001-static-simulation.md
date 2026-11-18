@@ -1,21 +1,21 @@
-# ADR-001 — Deterministic simulation before live integrations
+# ADR-001 — Priorizar una simulación reproducible antes de integrar sistemas reales
 
-**Status:** Accepted for MVP · **Date:** 2026-11-18
+**Estado:** aceptada para el MVP · **Fecha:** 18/11/2026
 
-## Context
+## Contexto
 
-The portfolio objective is to demonstrate architecture governance, business-service impact and technology management decisions. Collecting genuine telemetry requires credentials, tenant access, infrastructure inventory and privacy/security controls. None are appropriate for an open demonstration repository.
+ATLAS busca demostrar criterios de gobierno tecnológico, impacto sobre servicios de negocio y decisiones de continuidad. Integrar métricas reales requeriría inventarios, credenciales, acceso a plataformas y controles de privacidad que no corresponden a un proyecto público de demostración.
 
-## Decision
+## Decisión
 
-Build an explainable, zero-dependency static application with synthetic scenario data, pure decision logic, automated tests and a Cloudflare-ready build directory. Keep all assumptions visible and the decision/export engine separate from presentation.
+Desarrollar una aplicación estática y explicable, sin dependencias de ejecución externas, con escenarios ficticios, lógica de dominio independiente de la interfaz, pruebas automatizadas y una salida compatible con Cloudflare. Documentar todos los supuestos y mantener separadas las reglas de negocio de su presentación.
 
-## Consequences
+## Consecuencias
 
-**Advantages:** reproducibility, no provider lock-in at the model layer, no billable database, no real secrets, predictable test fixtures and straightforward source review.
+**Ventajas:** reproducibilidad, costo bajo, ausencia de credenciales y datos sensibles, independencia del proveedor cloud en el motor, pruebas deterministas y facilidad de revisión.
 
-**Trade-offs:** no production observability, no dynamic topology discovery, no remote persistence, no real RTO or availability measurements. A higher-fidelity DR engine will require operational evidence and a significantly richer dependency model.
+**Limitaciones:** no hay telemetría ni descubrimiento real, persistencia multiusuario, mediciones de RTO/SLA ni resultados verificados de recuperación. Un modelo de DR de mayor fidelidad requiere evidencias operativas y dependencias más detalladas.
 
-## Revisit when
+## Condiciones para revisar la decisión
 
-A real data source, multi-user workflow, authenticated evidence repository or verified Cloudflare deployment requires a backend. Select Worker services (D1, KV or Durable Objects) only once their consistency and workload needs are demonstrated.
+Si se incorporan fuentes de datos reales, autenticación, evidencias persistentes o flujos de aprobación, evaluar un backend Cloudflare Worker y servicios como D1, KV o Durable Objects según necesidades concretas de consistencia y carga.
