@@ -77,7 +77,7 @@ export function assertValidState(state) {
   const ids=new Set(state.verticals.map(v=>v.id));
   const isStr=x=>typeof x==='string'&&x.length<=1500;
   const finite=x=>typeof x==='number'&&Number.isFinite(x);
-  const validDate=x=>typeof x==='string'&&/^\\d{4}-\\d{2}-\\d{2}$/.test(x);
+  const validDate=x=>typeof x==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(x);
   for(const v of state.verticals){
     if(!isStr(v.name)||!isStr(v.owner)||!isStr(v.description))throw new Error('Vertical con campos inválidos.');
   }
