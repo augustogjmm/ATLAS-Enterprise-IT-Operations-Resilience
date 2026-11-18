@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {RemoteWorkspaces,RemoteWorkspaceError,canEditWorkspace,canManageMembers,canAudit} from '../public/remote-workspaces.js';
+import {RemoteWorkspaces,RemoteWorkspaceError,canEditWorkspace,canManageMembers,canAudit,canRestore} from '../public/remote-workspaces.js';
 
 test('cliente V5 inicia sin solicitudes y envía credenciales solo al origen propio',async()=>{
   const calls=[];
@@ -26,6 +26,7 @@ test('cliente V5 incluye revision y state al guardar; no envía JSON por GET',as
   assert.deepEqual(await api.save('org/a','w 1',1,state),{revision:2});
   assert.equal(calls[0].url,'/api/v1/tenants/org%2Fa/workspaces/w%201');
   assert.equal(calls[0].options.method,'PUT');
+  assert.equal(calls[0].options.headers['X-Atlas-CSRF'],'v5');
   assert.deepEqual(JSON.parse(calls[0].options.body),{revision:1,state});
   await api.open('org-a','workspace-1');
   assert.equal(calls[1].options.method,'GET');
@@ -47,4 +48,23 @@ test('roles visuales orientativos: el acceso real se valida en backend',()=>{
   assert.equal(canManageMembers('editor'),false);
   assert.equal(canAudit('auditor'),true);
   assert.equal(canAudit('viewer'),false);
+  assert.equal(canRestore('owner'),true);
+  assert.equal(canRestore('admin'),true);
+  assert.equal(canRestore('editor'),false);
+});
+
+test('historial remoto y restauración envían revisión esperada y cabecera CSRF',async()=>{
+  const calls=[];
+  const api=new RemoteWorkspaces(async (url,options)=>{
+    calls.push({url,options});
+    return Response.json(options.method==='GET'?{revisions:[{revision:2},{revision:1}]}:{revision:3,restoredFrom:1});
+  });
+  const list=await api.revisions('org-a','w-1');
+  assert.deepEqual(list.revisions.map(r=>r.revision),[2,1]);
+  const restored=await api.restore('org-a','w-1',1,2);
+  assert.deepEqual(restored,{revision:3,restoredFrom:1});
+  assert.equal(calls[1].url,'/api/v1/tenants/org-a/workspaces/w-1/revisions/1/restore');
+  assert.equal(calls[1].options.method,'PUT');
+  assert.equal(calls[1].options.headers['X-Atlas-CSRF'],'v5');
+  assert.deepEqual(JSON.parse(calls[1].options.body),{revision:2});
 });
