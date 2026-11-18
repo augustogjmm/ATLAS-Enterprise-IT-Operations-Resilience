@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0a1020">
+  <meta name="description" content="ATLAS is a synthetic executive command center for enterprise IT architecture, continuity, operations and resilience decision making.">
+  <title>ATLAS | Enterprise IT Operations & Resilience</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <div class="workspace">
+    <aside class="sidebar" aria-label="Primary navigation">
+      <a class="brand" href="#overview" aria-label="ATLAS home">
+        <span class="brand-symbol" aria-hidden="true">A<span class="brand-dot">·</span></span>
+        <span><strong>ATLAS</strong><small>ENTERPRISE TECHNOLOGY</small></span>
+      </a>
+      <div class="sidebar-section-title">EXECUTIVE WORKSPACE</div>
+      <nav class="nav-group" aria-label="Dashboard sections">
+        <a href="#overview" class="nav-link active"><span class="nav-icon">◫</span> Command center</a>
+        <a href="#architecture" class="nav-link"><span class="nav-icon">◇</span> Enterprise architecture</a>
+        <a href="#services" class="nav-link"><span class="nav-icon">▤</span> Business services</a>
+        <a href="#decisions" class="nav-link"><span class="nav-icon">⌁</span> Decision intelligence</a>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="sidebar-info"><span class="status-light"></span> SYNTHETIC ENVIRONMENT</div>
+        <div class="sidebar-note">Independent technology leadership demonstration. No live infrastructure or employer data.</div>
+        <a class="sidebar-profile" href="https://github.com/augustogjmm" target="_blank" rel="noopener noreferrer">Executive portfolio <span aria-hidden="true">↗</span></a>
+      </div>
+    </aside>
+
+    <main class="main" id="overview">
+      <header class="topbar">
+        <div class="breadcrumb">WORKSPACE <span>/</span> EXECUTIVE COMMAND CENTER</div>
+        <div class="topbar-end"><span class="snapshot">MODEL V0.1</span><span class="session-status"><span class="status-light"></span> SIMULATION ACTIVE</span></div>
+      </header>
+      <div class="content">
+        <section class="hero">
+          <div class="hero-copy">
+            <div class="eyebrow">ENTERPRISE TECHNOLOGY OPERATIONS <span class="eyebrow-line"></span> RESILIENCE INTELLIGENCE</div>
+            <h1>Make resilience <em>decisions,</em><br>not just dashboards.</h1>
+            <p>Translate infrastructure dependencies into business-service impact, recovery objectives and explainable investment trade-offs.</p>
+            <div class="hero-tags"><span>ARCHITECTURE</span><span>BUSINESS CONTINUITY</span><span>IT GOVERNANCE</span></div>
+          </div>
+          <div class="hero-mark" aria-hidden="true">
+            <div class="orb orb-one"></div><div class="orb orb-two"></div>
+            <div class="orb-center">A<span>·</span></div>
+            <div class="orbit-label orbit-top">OPERATIONS</div><div class="orbit-label orbit-bottom">RESILIENCE</div>
+          </div>
+        </section>
+
+        <section class="simulation-strip" aria-label="Scenario controls">
+          <div class="simulation-heading"><div class="kicker">01 / SCENARIO EXPLORER</div><h2>Operational stress test</h2><p>Change an event to evaluate its modeled blast radius.</p></div>
+          <div class="control">
+            <label for="scenario-select">DISRUPTION SCENARIO</label>
+            <select id="scenario-select" aria-label="Disruption scenario"></select>
+          </div>
+          <div class="control">
+            <label for="intervention-select">MANAGEMENT RESPONSE</label>
+            <select id="intervention-select" aria-label="Management response"></select>
+          </div>
+          <button class="export-btn" id="export-btn" type="button" title="Export scenario evidence as JSON">Export assessment <span aria-hidden="true">↗</span></button>
+        </section>
+
+        <section class="metrics-grid" aria-label="Operational summary">
+          <article class="metric-card"><div class="metric-top"><span>SERVICES MODELED</span><span class="metric-symbol">◈</span></div><strong id="metric-services">—</strong><div class="metric-foot"><span>Business capability coverage</span><span class="metric-mini">IN SCOPE</span></div></article>
+          <article class="metric-card"><div class="metric-top"><span>SERVICES IMPACTED</span><span class="metric-symbol">↘</span></div><strong id="metric-affected">—</strong><div class="metric-foot"><span>Outage or failover event</span><span id="impact-tag" class="metric-mini">—</span></div></article>
+          <article class="metric-card"><div class="metric-top"><span>RTO / RPO BREACHES</span><span class="metric-symbol">◷</span></div><strong id="metric-breaches">—</strong><div class="metric-foot"><span>Modeled target exceedance</span><span id="breach-tag" class="metric-mini">—</span></div></article>
+          <article class="metric-card accent-card"><div class="metric-top"><span>SCENARIO RISK INDEX</span><span class="metric-symbol">⌁</span></div><div class="metric-risk"><strong id="metric-risk">—</strong><span>/ 100</span></div><div class="risk-track" aria-label="Modeled risk index"><span id="risk-fill"></span></div><div class="metric-foot"><span>Weighted, illustrative score</span><span>NOT A RATING</span></div></article>
+        </section>
+
+        <section class="scenario-narrative" aria-live="polite">
+          <div class="narrative-symbol">i</div>
+          <div><strong id="scenario-label">Loading scenario…</strong><p id="scenario-description">Model inputs are being evaluated.</p></div>
+          <div class="narrative-state" id="scenario-category">MODEL</div>
+        </section>
+
+        <section class="two-column" id="architecture">
+          <article class="panel architecture-panel">
+            <div class="panel-heading"><div><div class="kicker">02 / ARCHITECTURE VISIBILITY</div><h2>Infrastructure dependency map</h2><p>Components by location. A failed node can affect multiple business services.</p></div><span class="panel-tag">SYNTHETIC TOPOLOGY</span></div>
+            <div class="topology" id="topology" aria-label="Infrastructure topology"></div>
+            <div class="legend"><span><i class="legend-dot healthy"></i> Available</span><span><i class="legend-dot failed"></i> Failed</span><span><i class="legend-dot exposed"></i> Reduced redundancy</span></div>
+          </article>
+          <article class="panel priorities-panel">
+            <div class="panel-heading"><div><div class="kicker">03 / EXECUTIVE SIGNALS</div><h2>Risk & recovery posture</h2><p>What requires a management decision.</p></div></div>
+            <div class="posture-row"><span class="posture-icon">01</span><div><div class="posture-label">Tier 1 service disruption</div><div class="posture-value" id="posture-critical">—</div></div></div>
+            <div class="posture-row"><span class="posture-icon">02</span><div><div class="posture-label">Reduced recovery redundancy</div><div class="posture-value" id="posture-redundancy">—</div></div></div>
+            <div class="posture-row"><span class="posture-icon">03</span><div><div class="posture-label">Decision assessment</div><div class="posture-value" id="posture-decision">—</div></div></div>
+            <div class="posture-note"><strong>Model boundary</strong><p>Alternatives are assumed dependency paths—not proof of tested DR or production readiness.</p></div>
+          </article>
+        </section>
+
+        <section class="panel service-panel" id="services">
+          <div class="panel-heading"><div><div class="kicker">04 / BUSINESS SERVICE CONTINUITY</div><h2>Recovery objective assessment</h2><p>RTO and RPO comparison by critical business capability.</p></div><span class="panel-tag">6 BUSINESS SERVICES</span></div>
+          <div class="table-scroll">
+            <table>
+              <thead><tr><th scope="col">BUSINESS SERVICE</th><th scope="col">CLASS</th><th scope="col">SERVICE POSTURE</th><th scope="col">RECOVERY / RTO</th><th scope="col">DATA LOSS / RPO</th></tr></thead>
+              <tbody id="service-rows"></tbody>
+            </table>
+          </div>
+          <div class="table-footer"><span>RTO = maximum acceptable recovery time; RPO = maximum acceptable data loss.</span><span>All values are fictional assumptions.</span></div>
+        </section>
+
+        <section class="decision-grid" id="decisions">
+          <article class="panel">
+            <div class="panel-heading"><div><div class="kicker">05 / DECISION INTELLIGENCE</div><h2>Investment trade-off</h2><p>Compare an intervention with the baseline for the same incident.</p></div></div>
+            <div class="investment-name" id="investment-name">—</div><p class="investment-rationale" id="investment-rationale">—</p>
+            <div class="comparison-grid">
+              <div><span>RISK INDEX CHANGE</span><strong id="comparison-risk">—</strong><small>points improved</small></div>
+              <div><span>TARGET BREACHES AVOIDED</span><strong id="comparison-breaches">—</strong><small>modeled service objectives</small></div>
+            </div>
+            <div class="decision-caveat">A modeled benefit is not a procurement justification or a validated service-level improvement.</div>
+          </article>
+          <article class="panel finance-panel">
+            <div class="panel-heading"><div><div class="kicker">06 / TECHNOLOGY GOVERNANCE</div><h2>Budget perspective</h2><p>Illustrative annual baseline plus selected intervention.</p></div></div>
+            <div class="money-row"><span>Annual operating expenditure</span><strong id="budget-opex">—</strong></div>
+            <div class="money-bar"><div id="opex-bar" class="money-fill"></div></div>
+            <div class="money-row"><span>Capital investment envelope</span><strong id="budget-capex">—</strong></div>
+            <div class="money-bar"><div id="capex-bar" class="money-fill second"></div></div>
+            <div class="budget-foot" id="budget-change">—</div>
+          </article>
+        </section>
+
+        <footer class="footer"><span><strong>ATLAS</strong> / Enterprise IT Operations & Resilience</span><span>Independent executive demonstration · Synthetic data · No live dependencies</span><a href="https://github.com/augustogjmm/ATLAS-Enterprise-IT-Operations-Resilience" target="_blank" rel="noopener noreferrer">Source & methodology ↗</a></footer>
+      </div>
+    </main>
+  </div>
+  <div class="sr-only" id="live-region" role="status" aria-live="polite"></div>
+</body>
+</html>
