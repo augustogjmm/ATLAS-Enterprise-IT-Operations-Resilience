@@ -88,6 +88,8 @@ export function kpiResult(state,kpi,today){
   return {value,target:kpi.target,reached,level,unit:spec.unit,direction:spec.direction,description:spec.description};
 }
 export function keyResultProgress(state,result,today){
+  const parent=state.objectives.find(o=>o.id===result.objectiveId);
+  if(parent?.status==='cerrado'&&parent.closureResults?.[result.id])return parent.closureResults[result.id];
   const kpi=state.kpis.find(k=>k.id===result.kpiId);
   if(!kpi)return {progress:null,level:'unknown',value:null,reason:'KPI vinculado inexistente.'};
   const value=metricValue(state,kpi.metric,today);
@@ -102,6 +104,7 @@ export function keyResultProgress(state,result,today){
   return {value,progress,level,reason:achieved?'Meta lograda.':'Resultado en evolución respecto de la línea base.'};
 }
 export function objectiveProgress(state,objective,today){
+  if(objective.status==='cerrado'&&objective.closureProgress)return objective.closureProgress;
   const results=state.keyResults.filter(k=>k.objectiveId===objective.id);
   if(!results.length)return {progress:null,level:'unknown',tracked:0,total:0,reason:'Sin resultados clave.'};
   const measured=results.map(r=>keyResultProgress(state,r,today)).filter(r=>r.progress!==null);
@@ -165,11 +168,15 @@ export function addKeyResult(state,record,idFactory){
   try{validatePerformanceState(state)}catch(err){state.keyResults.pop();throw err;}
   return result;
 }
-export function closeObjective(state,id,today){
+export function closeObjective(state,id,today,evidence){
   const objective=state.objectives.find(o=>o.id===id);
   if(!objective||objective.status!=='activo')throw new Error('Solo se cierran objetivos activos.');
   const progress=objectiveProgress(state,objective,today);
-  if(progress.progress===null||progress.tracked!==progress.total)throw new Error('No se puede cerrar sin todos los KR medidos.');
-  objective.status='cerrado';objective.closedAt=today;
+  if(progress.progress===null||progress.tracked!==progress.total||progress.total===0)throw new Error('No se puede cerrar sin todos los KR medidos.');
+  if(!textValid(evidence,8,1500))throw new Error('El cierre requiere evidencia de al menos ocho caracteres.');
+  const results=state.keyResults.filter(r=>r.objectiveId===id);
+  objective.closureResults=Object.fromEntries(results.map(r=>[r.id,keyResultProgress(state,r,today)]));
+  objective.closureProgress={...progress,reason:'Progreso registrado al momento del cierre; no cambia con mediciones posteriores.'};
+  objective.status='cerrado';objective.closedAt=today;objective.closureEvidence=evidence.trim();
   return objective;
 }
