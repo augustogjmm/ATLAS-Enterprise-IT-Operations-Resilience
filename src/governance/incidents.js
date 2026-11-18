@@ -139,6 +139,16 @@ export function importIncidents(state,candidates){
   state.incidents=next;
   return {inserted,updated,unchanged,total:state.incidents.length};
 }
+export function resolveIncident(state,id,resolvedAt){
+  validateIncidentState(state);
+  const incident=state.incidents.find(it=>it.id===id);
+  if(!incident)throw new Error('Incidente inexistente.');
+  if(incident.resolvedAt!==null)throw new Error('El incidente ya tiene una resolución registrada.');
+  boundedDate(resolvedAt,'Fecha de resolución');
+  if(Date.parse(resolvedAt)<Date.parse(incident.openedAt))throw new Error('La resolución no puede ser anterior a la apertura.');
+  incident.resolvedAt=resolvedAt;
+  return incident;
+}
 export function resolutionMinutes(incident){
   return incident.resolvedAt===null?null:(Date.parse(incident.resolvedAt)-Date.parse(incident.openedAt))/60000;
 }
