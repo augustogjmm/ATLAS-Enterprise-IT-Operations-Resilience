@@ -4,6 +4,8 @@ import {
   registerCapacity, teamStatus, registerTeamCapacity, registerAction, completeAction, validateRisk, addEvent
 } from './lib/governance/core.js';
 import {worstSignal, riskSignal, actionSignal, infrastructureSignal, workforceSignal, assessmentSignal, serviceSignal, verticalSignal, executiveSummary, riskMatrix} from './lib/governance/insights.js';
+import {METRICS,KPI_OPTIONS,ensurePerformanceState,seedDemoPerformance,validatePerformanceState,kpiResult,objectiveProgress,addKpi,addObjective,addKeyResult,closeObjective} from './lib/governance/performance.js';
+import {performanceView as renderPerformanceView} from './performance-ui.js';
 
 const STORAGE_KEY='atlas-governance-workspace-v1';
 const today=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')};
@@ -26,6 +28,7 @@ const getRisk=id=>state.risks.find(r=>r.id===id);
 const getService=id=>state.services.find(s=>s.id===id);
 const idFactory=prefix=>prefix+'-'+crypto.randomUUID();
 const viewMeta={
+ performance:['KPI y OKR tecnológicos','Indicadores, objetivos, líneas base y resultados clave calculados'],
  overview:['Visión ejecutiva','Alertas accionables y seguimiento de prioridades'],
  verticals:['Verticales y equipos','Gobierno por dominio y responsables'],
  capacity:['Capacity management','Utilización, umbrales y proyección de tres meses'],
@@ -40,18 +43,27 @@ let modal=null;
 let toastTimeout=null;
 let storageOK=true;
 
+function upgrade(data){
+ assertValidState(data);
+ const missing=!Array.isArray(data.kpis)&&!Array.isArray(data.objectives)&&!Array.isArray(data.keyResults);
+ ensurePerformanceState(data);
+ if(missing&&data.kind==='demo')seedDemoPerformance(data);
+ validatePerformanceState(data);
+ return data;
+}
 function load(){
-  try{
-    const raw=localStorage.getItem(STORAGE_KEY);
-    if(raw)return assertValidState(JSON.parse(raw));
-    const data=createDemo();
-    localStorage.setItem(STORAGE_KEY,JSON.stringify(data));return data;
-  }catch(err){storageOK=false;return createDemo();}
+ try {
+  const raw=localStorage.getItem(STORAGE_KEY);
+  const data=raw?upgrade(JSON.parse(raw)):seedDemoPerformance(createDemo());
+  if(!raw||!JSON.parse(raw).kpis)localStorage.setItem(STORAGE_KEY,JSON.stringify(data));
+  return data;
+ } catch(err){storageOK=false;return seedDemoPerformance(createDemo());}
 }
 let state=load();
 function save(message){
   state.kind=state.kind==='demo'?'custom':state.kind;
   assertValidState(state);
+  validatePerformanceState(state);
   try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));storageOK=true;}
   catch(err){storageOK=false;notice('No se pudo guardar. Exportá un respaldo; el navegador bloqueó el almacenamiento.',true)}
   render();
@@ -132,6 +144,10 @@ function overview(){
  <div class="section-eyeline">04 / TRAZABILIDAD DE GESTIÓN</div>
  <section class="executive-panel"><div class="executive-panel-head"><div><h3>De la brecha al cierre verificable</h3><p>Un riesgo no se considera mitigado únicamente por haber completado la acción.</p></div></div>
   <div class="process-flow"><div class="process-step"><strong>01 / EVALUAR</strong><p>Assessment o capacidad registrada.</p></div><div class="process-step"><strong>02 / IDENTIFICAR</strong><p>Riesgo y criticidad calculados.</p></div><div class="process-step"><strong>03 / EJECUTAR</strong><p>Plan, responsable, plazo y evidencia.</p></div><div class="process-step"><strong>04 / VALIDAR</strong><p>Verificación independiente del cierre.</p></div></div>
+ </section>
+ <div class="section-eyeline">05 / KPI Y OKR · RESULTADOS TECNOLÓGICOS</div>
+ <section class="executive-panel"><div class="executive-panel-head"><div><span class="executive-overline">STRATEGY EXECUTION</span><h3>Objetivos conectados a indicadores</h3><p>El avance no se carga manualmente: surge de los registros y de las metas definidas.</p></div>${mini('Abrir KPI y OKR ↗','view:performance','','secondary')}</div>
+ ${state.kpis.length?'<div class="performance-overview">'+state.kpis.slice(0,3).map(k=>{const r=kpiResult(state,k,ts);return '<div class="performance-overview-item"><span>'+esc(k.name)+'</span><strong>'+esc(r.value===null?'Sin datos':r.unit==='cantidad'?nfmt(r.value):fmtPct(r.value))+'</strong>'+semaphore({level:r.level,label:r.level==='ok'?'En meta':r.level==='unknown'?'Sin evaluar':'Desviado',reason:r.description})+'</div>';}).join('')+'</div>':empty('KPI pendientes de configuración','Entrá en KPI y OKR para definir tus primeros indicadores.')}
  </section>
  `;
 }
@@ -310,7 +326,7 @@ function render(){
  $('view-title').textContent=meta[0];$('view-subtitle').textContent=meta[1];
  $('breadcrumb-current').textContent=meta[0].toUpperCase();
  $('environment-label').textContent=state.kind==='demo'?'DATOS FICTICIOS DE DEMOSTRACIÓN':state.kind==='local'?'ESPACIO LOCAL SIN DATOS DE DEMOSTRACIÓN':'DATOS LOCALES EDITADOS · PUEDE CONTENER EJEMPLOS FICTICIOS';
- const pages={overview,verticals:verticalsView,capacity:capacityView,assessments:assessmentsView,risks:risksView,actions:actionsView,continuity:continuityView,committee:committeeView};
+ const pages={overview,performance:()=>renderPerformanceView(state,today(),{esc,mini,semaphore,empty,nfmt,fmtPct}),verticals:verticalsView,capacity:capacityView,assessments:assessmentsView,risks:risksView,actions:actionsView,continuity:continuityView,committee:committeeView};
  $('view-root').innerHTML=(pages[view]||overview)();
  for(const node of document.querySelectorAll('[data-view]'))node.classList.toggle('selected',node.dataset.view===view);
 }
@@ -325,8 +341,17 @@ const drOptions=[['sin-evaluar','Sin evaluar'],['aprobado','Prueba aprobada'],['
 
 function openForm(type,id=''){
  if(type.startsWith('view:')){switchView(type.slice(5));return;}
+ if(type==='seed-performance'){
+  if(state.kpis.length||state.objectives.length||state.keyResults.length)return notice('Ya hay indicadores o objetivos; los ejemplos no sobrescribirán registros.',true);
+  if(!confirm('¿Agregar KPI y OKR de ejemplo sin modificar tus riesgos, servicios ni acciones? Las líneas base son ilustrativas.'))return;
+  seedDemoPerformance(state);addEvent(state,'okr','Se agregaron KPI y OKR de demostración sin modificar los registros operativos.',today());save('KPI y OKR de ejemplo agregados.');return;
+ }
  const v=vertOptions(),r=riskOptions();let title,description='',fields='',submit='Guardar registro';
- if(type==='vertical'){title='Nueva vertical';fields=input('name','Nombre de la vertical','text','',{required:true,wide:true})+input('owner','Responsable','text','',{required:true})+textarea('description','Alcance y responsabilidades');}
+ if(type==='kpi'){title='Nuevo KPI tecnológico';description='Indicadores corporativos calculados automáticamente a partir de registros de ATLAS; elegí la fórmula y la meta.';fields=select('metric','Indicador y fórmula',KPI_OPTIONS)+input('name','Nombre ejecutivo del KPI','text','',{required:true,wide:true})+input('target','Meta','number','',{required:true,step:'any'})+input('owner','Responsable de seguimiento','text','',{required:true});}
+ else if(type==='okr'){title='Nuevo objetivo tecnológico';description='El objetivo se mide mediante resultados clave vinculados a los KPI disponibles.';fields=input('title','Objetivo estratégico','text','',{required:true,wide:true})+input('owner','Responsable del objetivo','text','',{required:true})+select('verticalId','Alcance',[['','Corporativo'],...vertOptions()])+input('startDate','Inicio','date',today(),{required:true})+input('dueDate','Fecha objetivo','date','',{required:true});}
+ else if(type==='kr'){title='Vincular resultado clave';description='El KR evoluciona automáticamente al cambiar los registros que alimentan el KPI. Definí una línea base y una meta de mejora.';const available=state.objectives.filter(o=>o.status==='activo');if(!available.length||!state.kpis.length)return notice('Primero registrá un objetivo activo y al menos un KPI.',true);fields=select('objectiveId','Objetivo',available.map(o=>[o.id,o.title]),id)+select('kpiId','Indicador medido',state.kpis.map(k=>[k.id,k.name]))+input('baseline','Línea base','number','',{required:true,step:'any'})+input('target','Meta del resultado clave','number','',{required:true,step:'any'});}
+ else if(type==='okr-close'){const obj=state.objectives.find(o=>o.id===id);if(!obj)return notice('Objetivo inexistente.',true);title='Cerrar objetivo tecnológico';description='Se congelarán los resultados y el avance en la fecha de cierre. El cierre no implica necesariamente que se alcanzó la meta.';fields='<div class="modal-note">'+esc(obj.title)+'</div>'+textarea('evidence','Evidencia o acta del cierre');submit='Registrar cierre';}
+ else if(type==='vertical'){title='Nueva vertical';fields=input('name','Nombre de la vertical','text','',{required:true,wide:true})+input('owner','Responsable','text','',{required:true})+textarea('description','Alcance y responsabilidades');}
  else if(type==='assessment'){title='Registrar assessment';description='Madurez 1–2 genera un riesgo vinculado automáticamente.';fields=select('verticalId','Vertical',v)+select('domain','Dimensión',DOMAINS.map(x=>[x,x]))+select('score','Madurez',[[1,'1 — Crítica'],[2,'2 — Inicial'],[3,'3 — Definida'],[4,'4 — Gestionada'],[5,'5 — Optimizada']])+input('owner','Responsable','text','',{required:true})+textarea('finding','Hallazgo o brecha')+textarea('evidence','Referencia de evidencia (opcional)','',false);}
  else if(type==='capacity'){title='Registrar medición de capacidad';description='El uso igual o superior al umbral registra un riesgo sin plan automáticamente.';fields=select('verticalId','Vertical',v)+input('name','Recurso o servicio','text','',{required:true})+input('used','Utilizado','number','',{required:true,min:0,step:'any'})+input('total','Capacidad total','number','',{required:true,min:0.001,step:'any'})+input('unit','Unidad (TB, vCPU, Gbps...)','text','TB',{required:true})+input('thresholdPct','Umbral de alerta (%)','number','80',{required:true,min:1,max:100,step:'any'})+input('growthPct','Crecimiento mensual estimado (%)','number','3',{required:true,min:0,max:100,step:'any'})+input('owner','Responsable','text','',{required:true});}
  else if(type==='team'){title='Capacidad de un equipo';description='La carga sobre el umbral o cobertura inferior al 90% genera un riesgo vinculado.';fields=select('verticalId','Vertical',v)+input('name','Equipo o función','text','',{required:true})+input('availableFte','Capacidad disponible (FTE)','number','',{required:true,min:0.1,step:'any'})+input('allocatedFte','Carga asignada (FTE)','number','',{required:true,min:0,step:'any'})+input('coveragePct','Cobertura operativa / guardias (%)','number','100',{required:true,min:0,max:100,step:'any'})+input('thresholdPct','Umbral de carga (%)','number','90',{required:true,min:1,max:100,step:'any'})+input('owner','Responsable del equipo','text','',{required:true})+textarea('skillsGap','Brechas de capacidades o reemplazos', '', false);}
@@ -349,7 +374,11 @@ function textRequired(v,label){if(!v||!String(v).trim())throw new Error('Indicá
 function submitRecord(data){
  const type=modal.type,id=modal.id,ts=today();
  const req=(k,label)=>textRequired(data[k],label);
- if(type==='vertical'){
+ if(type==='kpi'){addKpi(state,{...data,name:req('name','nombre del KPI'),owner:req('owner','responsable')},idFactory);addEvent(state,'kpi','Nuevo KPI tecnológico registrado: '+data.name,ts);}
+ else if(type==='okr'){addObjective(state,{...data,title:req('title','objetivo'),owner:req('owner','responsable')},idFactory);addEvent(state,'okr','Objetivo creado: '+data.title,ts);}
+ else if(type==='kr'){addKeyResult(state,data,idFactory);addEvent(state,'okr','Resultado clave vinculado a un KPI',ts);}
+ else if(type==='okr-close'){closeObjective(state,id,ts,req('evidence','evidencia de cierre'));addEvent(state,'okr','Objetivo cerrado con evidencia',ts);}
+ else if(type==='vertical'){
   if(state.verticals.length>=100)throw new Error('Límite de verticales alcanzado.');
   state.verticals.push({id:idFactory('v'),name:req('name','nombre'),owner:req('owner','responsable'),description:data.description?.trim()||''});
   addEvent(state,'vertical','Se creó una nueva vertical',ts);
@@ -397,10 +426,10 @@ document.addEventListener('click',e=>{
   setTimeout(()=>URL.revokeObjectURL(objectUrl),1500);notice('Respaldo JSON descargado.');
  }
  if(cmd.dataset.command==='demo'&&confirm('¿Reemplazar los datos locales actuales por la demostración ficticia? Exportá un respaldo si querés conservarlos.')){
-  state=createDemo();save('Demostración restaurada.');state.kind='demo';localStorage.setItem(STORAGE_KEY,JSON.stringify(state));render();
+  state=seedDemoPerformance(createDemo());save('Demostración restaurada.');state.kind='demo';localStorage.setItem(STORAGE_KEY,JSON.stringify(state));render();
  }
  if(cmd.dataset.command==='empty'&&confirm('¿Vaciar todos los registros locales? Esta acción no se puede deshacer sin un respaldo exportado.')){
-  state=makeEmpty();save('Espacio local vacío preparado.');switchView('verticals');
+  state=ensurePerformanceState(makeEmpty());save('Espacio local vacío preparado.');switchView('verticals');
  }
 });
 $('record-form').addEventListener('submit',e=>{
@@ -415,14 +444,14 @@ $('import-file').addEventListener('change',async e=>{
  const file=e.target.files?.[0];e.target.value='';if(!file)return;
  if(file.size>1024*1024)return notice('El archivo supera 1 MB.',true);
  try{
-  const data=JSON.parse(await file.text());assertValidState(data);
+  const data=upgrade(JSON.parse(await file.text()));
   if(!confirm('¿Reemplazar todos los registros locales por este respaldo?'))return;
   state=data;state.kind='custom';save('Respaldo importado.');switchView('overview');
  }catch(err){notice('No se importó: '+(err.message||'JSON inválido'),true)}
 });
 window.addEventListener('storage',e=>{
  if(e.key!==STORAGE_KEY)return;
- try{state=e.newValue?assertValidState(JSON.parse(e.newValue)):createDemo();render();notice('Los registros fueron actualizados desde otra pestaña.')}catch{notice('No se pudo sincronizar esta pestaña.',true)}
+ try{state=e.newValue?upgrade(JSON.parse(e.newValue)):seedDemoPerformance(createDemo());render();notice('Los registros fueron actualizados desde otra pestaña.')}catch{notice('No se pudo sincronizar esta pestaña.',true)}
 });
 render();
 if(!storageOK)notice('El almacenamiento local no está disponible: los cambios no persistirán.',true);

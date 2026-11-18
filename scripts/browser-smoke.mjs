@@ -26,7 +26,7 @@ const server = createServer(async (req, res) => {
   }
 });
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, ...(process.env.CI?{channel:'chrome'}:{}) });
 try {
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');

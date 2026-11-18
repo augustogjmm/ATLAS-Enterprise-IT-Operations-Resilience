@@ -1,16 +1,16 @@
 # ATLAS — IT Governance & Operations Management
 
-### De la observación a la ejecución: capacidad, assessments, riesgos, acciones y continuidad
+### Gobierno de Tecnología: KPI, OKR, capacity, assessments, riesgos, acciones y continuidad
 
 **ATLAS** es un proyecto personal demostrativo para roles de Head of IT, Gerencia de Infraestructura, Operaciones Tecnológicas y Arquitectura Empresarial. El propósito es mostrar cómo se organiza el **gobierno de tecnología basado en registros, responsables, prioridades y evidencias**, no solamente indicadores visuales.
 
-> **Versión funcional V1:** plataforma estática, con operaciones reales sobre datos almacenados en **el navegador del usuario**. El contenido de inicio es 100% ficticio, identificado como demostración. No monitorea infraestructura ni conecta servicios productivos. No utiliza todavía D1 ni autenticación multiusuario.
+> **Versión funcional V2:** plataforma estática, con operaciones reales sobre datos almacenados en **el navegador del usuario**. El contenido de inicio es 100% ficticio, identificado como demostración. No monitorea infraestructura ni conecta servicios productivos. No utiliza todavía D1 ni autenticación multiusuario.
 
 ## ¿Qué podés hacer?
 
 | Área | Operaciones disponibles |
 |---|---|
-| **Verticales y equipos** | Registrar unidades de gestión con responsables y ámbitos, comparar madurez y exposición. |
+| **KPI / OKR** | Definir indicadores y objetivos con responsables y metas, vincular KR con KPI, calcular avances desde registros, registrar cierre con evidencia y congelar valores al cerrar. |\n| **Verticales y equipos** | Registrar unidades de gestión con responsables y ámbitos, comparar madurez y exposición. |
 | **Capacity tecnológico** | Registrar consumo/total por recurso, umbrales y tasa de crecimiento; calcular utilización y proyección a tres meses. Una medición sobre el umbral genera un riesgo vinculado. |
 | **Capacity de equipos** | Registrar FTE disponibles/asignados, cobertura operativa, brechas de reemplazo o habilidades. Sobrecarga o cobertura baja dispara un riesgo. No se evalúa desempeño individual. |
 | **Assessments** | Registrar dimensiones, puntuación 1 a 5, hallazgos, responsables y evidencia. Calificación 1 o 2 crea un riesgo automáticamente. |
@@ -30,7 +30,7 @@
 5. **Cierre:** validar la mitigación del riesgo con evidencia independiente.
 6. **Indicadores:** la situación ejecutiva se actualiza a partir de los registros y sus relaciones.
 
-La segunda automatización vincula **mediciones de capacity sobre el umbral** con riesgos. La puntuación de exposición resulta de **probabilidad × impacto**, no de un modelo probabilístico.
+La segunda automatización vincula **mediciones de capacity sobre el umbral** con riesgos. Los KPI y KR se recalculan cuando los registros cambian: un riesgo que recibe un plan modifica la cobertura, los riesgos sin plan y los OKR que dependan de esas métricas. La puntuación de exposición resulta de **probabilidad × impacto**, no de un modelo probabilístico.
 
 ## Ejecución local
 
@@ -54,7 +54,7 @@ Navegador / ATLAS Governance
   ├── public/index.html          -> experiencia de gobierno
   ├── public/governance.css      -> presentación responsive
   ├── public/governance.js       -> formularios, gestión, respaldos
-  ├── src/governance/core.js     -> motor de dominio determinista
+  ├── src/governance/core.js     -> motor de dominio determinista\n  ├── src/governance/insights.js -> semáforos ejecutivos, matriz de riesgos y status por vertical\n  ├── src/governance/performance.js -> métricas KPI y progreso de OKR verificables\n  ├── public/performance-ui.js  -> tablero de indicadores y objetivos
   └── localStorage              -> persistencia por navegador
 
 Simulador conceptual anterior
@@ -65,17 +65,27 @@ Simulador conceptual anterior
 
 El build copia `public/` y `src/` a `dist/`, preparado para **Cloudflare Workers Static Assets** sin backend dinámico, secretos ni pago obligatorio.
 
+## KPI / OKR: funcionalidad real y límites
+
+Un KPI selecciona una **fórmula predefinida**, un objetivo numérico y un responsable. El sistema deriva su valor de los registros locales del workspace; cuando no existe base suficiente, aparece **«Sin evaluar»**, nunca un falso «en meta».
+
+Los OKR tienen responsables, fecha de inicio/fin y resultados clave relacionados con los KPI. Cada KR requiere línea base y meta; su progreso deriva del KPI y se limita al intervalo 0–100 %. El promedio del objetivo solo considera KR medidos, con advertencia si existen KR sin datos. El cierre requiere evidencia y congela el resultado observado en ese instante.
+
+La pantalla **KPI y OKR tecnológicos** incorpora demostraciones ficticias en una instalación nueva. Los usuarios con registros ya editados conservan todos sus datos; pueden crear sus propios KPI o incorporar ejemplos voluntariamente sin sobrescribir los registros operativos.
+
+Los KPI disponibles son un **catálogo acotado de mediciones calculables**, no una plataforma completa de gestión de incidentes o importación ITSM. Todavía no hay fórmulas personalizadas por vertical, series históricas, presupuestos reales ni integraciones productivas.
+
 ## Seguridad y límites de uso
 
 **Persistencia real, pero local y de un solo navegador:** los registros pueden modificarse, mantenerse tras recargar y exportarse/importarse. **No son datos compartidos ni sincronizados en la nube**. Si se borra el almacenamiento del navegador o se utiliza otro dispositivo, los registros no estarán disponibles sin importar un respaldo. No hay autenticación, permisos, auditoría independiente o acceso multiusuario.
 
 **No cargar información empresarial confidencial ni datos personales.** Este entorno público está concebido como demostración. Los datos iniciales son ficticios; si el usuario introduce información propia, la aplicación no puede verificarla automáticamente.
 
-La siguiente evolución prevista es D1 + autenticación + control por roles, previo diseño de seguridad y validación de cuotas del plan gratuito. También quedan pendientes los OKR con resultados clave, importación de incidentes CSV y conectores de fuentes reales; **no se declaran implementados**.
+La siguiente evolución prevista es D1 + autenticación + control por roles, previo diseño de seguridad y validación de cuotas del plan gratuito. Quedan pendientes importación de incidentes CSV, conectores de fuentes reales, KPI por vertical y series históricas. No se declaran implementados.
 
 ## Documentación
 
-- [Modelo y criterios del primer circuito funcional](docs/GOBIERNO_FUNCIONAL_V1.md)
+- [Modelo y criterios del primer circuito funcional](docs/GOBIERNO_FUNCIONAL_V1.md)\n- [Definiciones y metodología KPI/OKR](docs/KPI_OKR_METODOLOGIA.md)
 - [Simulador de resiliencia y su arquitectura](docs/ARCHITECTURE.md)
 - [Guía de Cloudflare](docs/DESPLIEGUE_CLOUDFLARE.md)
 - [Seguridad](SECURITY.md)
