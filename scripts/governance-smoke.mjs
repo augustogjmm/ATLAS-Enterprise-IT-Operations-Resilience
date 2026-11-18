@@ -155,7 +155,7 @@ try{
  assert.equal(await page.locator('tr').filter({hasText:'CSV-E2E-02'}).count(),1);
 
  await page.locator('button[data-view="performance"]').click();
- assert.equal(await page.locator('.performance-kpi').count(),6);
+ assert.equal(await page.locator('.performance-kpi').count(),8);
  assert.equal(await page.locator('.okr-card').count(),3);
  await page.locator('button[data-view="risks"]').click();
  await page.locator('button[data-view="risks"]').click();
