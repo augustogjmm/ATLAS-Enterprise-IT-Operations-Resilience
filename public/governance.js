@@ -137,32 +137,53 @@ function overview(){
 }
 
 function verticalsView(){
+ const ts=today();
  const cards=state.verticals.map(v=>{
-   const assessments=state.assessments.filter(a=>a.verticalId===v.id);
-   const mean=assessments.length?assessments.reduce((a,b)=>a+Number(b.score),0)/assessments.length:null;
-   const risks=state.risks.filter(r=>r.verticalId===v.id&&r.status==='abierto');
-   const without=risks.filter(r=>riskTreatment(r,state.actions)==='Sin plan');
-   const capacities=state.capacities.filter(c=>c.verticalId===v.id&&capacityStatus(c).warning);
-   const teams=state.teamCapacities.filter(c=>c.verticalId===v.id&&teamStatus(c).warning);
-   return `<article class="vertical-card"><div class="vertical-head"><div><h3>${esc(v.name)}</h3><p>${esc(v.description)}<br>Responsable: ${esc(v.owner)}</p></div>${tag(without.length?'Prioridad de gestión':'En control',without.length?'amber':'neutral')}</div>
-   <div class="vertical-stats"><div class="vertical-stat"><span>MADUREZ / 5</span><strong>${mean===null?'—':nfmt(mean)}</strong></div><div class="vertical-stat"><span>RIESGOS SIN PLAN</span><strong>${without.length}</strong></div><div class="vertical-stat"><span>CAPACITY ALERTAS</span><strong>${capacities.length+teams.length}</strong></div></div>
+  const assessments=state.assessments.filter(a=>a.verticalId===v.id);
+  const mean=assessments.length?assessments.reduce((a,b)=>a+Number(b.score),0)/assessments.length:null;
+  const risks=state.risks.filter(r=>r.verticalId===v.id&&r.status==='abierto');
+  const without=risks.filter(r=>riskTreatment(r,state.actions)==='Sin plan');
+  const capacities=state.capacities.filter(c=>c.verticalId===v.id&&infrastructureSignal(c).level==='critical');
+  const teams=state.teamCapacities.filter(c=>c.verticalId===v.id&&workforceSignal(c).level==='critical');
+  const signal=verticalSignal(state,v.id,ts);
+  return `<article class="vertical-card signal-border-${signal.level}">
+    <div class="vertical-signal-top"><span class="executive-overline">VERTICAL / UNIDAD OPERATIVA</span>${semaphore(signal)}</div>
+    <h3>${esc(v.name)}</h3><p>${esc(v.description)}<br>Responsable: ${esc(v.owner)}</p>
+    <div class="vertical-stats"><div class="vertical-stat"><span>MADUREZ / 5</span><strong>${mean===null?'—':nfmt(mean)}</strong></div><div class="vertical-stat"><span>RIESGOS SIN PLAN</span><strong>${without.length}</strong></div><div class="vertical-stat"><span>CAPACITY CRÍTICA</span><strong>${capacities.length+teams.length}</strong></div></div>
+    <p class="mini-glossary">${esc(signal.reason)} ${signal.unknown?' · '+signal.unknown+' aspecto(s) sin evaluación.':''}</p>
    </article>`;
  }).join('');
- return `<section class="panel"><div class="panel-head"><div><h2>Verticales tecnológicas</h2><p>Dominio, accountability, madurez y exposición agregada.</p></div>${mini('Agregar vertical','vertical')}</div><div class="vertical-grid">${cards||empty('No hay verticales','Agregá una unidad de gestión para empezar.')}</div></section>`;
+ return `<section class="panel"><div class="panel-head"><div><h2>Estado por vertical tecnológica</h2><p>Madurez, riesgos, capacity y continuidad vinculados a cada responsable. El semáforo usa el peor estado registrado, sin ocultar datos faltantes.</p></div>${mini('Agregar vertical','vertical')}</div><div class="vertical-grid">${cards||empty('No hay verticales','Agregá una unidad de gestión para empezar.')}</div></section>`;
 }
 function capacityView(){
- const rows=state.capacities.map(c=>{
- const x=capacityStatus(c);
- return `<tr><td><span class="cell-title">${esc(c.name)}</span><span class="cell-meta">${esc(getVertical(c.verticalId)?.name||'')} · ${esc(c.owner)}</span></td><td class="number">${nfmt(c.used)} / ${nfmt(c.total)} ${esc(c.unit)}</td>
- <td><div class="priority ${x.warning?'warn':''}"><i class="dot"></i><span class="number">${fmtPct(x.utilization)}</span></div><div class="progress ${x.warning?'alert':''}"><span style="width:${Math.min(x.utilization||0,100)}%"></span></div><span class="cell-meta">Umbral: ${nfmt(x.limit)} %</span></td><td class="${x.futureWarning?'text-warn':'text-good'}">${fmtPct(x.forecast)}<span class="cell-meta">Crecimiento: ${nfmt(c.growthPct)}% mensual</span></td><td>${tag(x.warning?'Supera umbral':x.futureWarning?'Alerta proyectada':'Dentro del umbral',x.warning?'red':x.futureWarning?'amber':'neutral')}</td></tr>`;
+ const preview=state.capacities.slice(0,6).map(c=>{
+   const x=capacityStatus(c),signal=infrastructureSignal(c);
+   return `<article class="capacity-visual-card signal-border-${signal.level}"><div class="capacity-visual-card-head"><strong>${esc(c.name)}</strong>${semaphore(signal)}</div>
+    <div class="capacity-visual-card-number">${fmtPct(x.utilization)}</div>
+    ${percentBar(x.utilization,signal,x.limit)}
+    <p>Umbral ${nfmt(x.limit)}% · Proyección 3 meses: ${fmtPct(x.forecast)}<br>${esc(getVertical(c.verticalId)?.name||'Sin vertical')}</p></article>`;
  }).join('');
- return `<section class="panel"><div class="panel-head"><div><h2>Capacidad y previsión</h2><p>Utilización por recurso y proyección compuesta de tres meses (supuesto de crecimiento constante).</p></div>${mini('+ Nueva medición','capacity')}</div>
- ${rows?'<div class="table-wrap"><table class="data-table"><thead><tr><th>RECURSO / VERTICAL</th><th>USO Y TOTAL</th><th>UTILIZACIÓN</th><th>PROYECCIÓN 3 MESES</th><th>ESTADO</th></tr></thead><tbody>'+rows+'</tbody></table></div>':empty('Sin mediciones','Agregá una capacidad para registrar uso, límite y crecimiento.')}
- <div class="modal-note">Automatización real: al registrar una medición sobre el umbral, ATLAS crea un riesgo vinculado con estado «Sin plan». La proyección no es telemetría: se calcula exclusivamente con los valores ingresados.</div></section>
- <section class="panel"><div class="panel-head"><div><h2>Capacidad de los equipos y cobertura</h2><p>FTE disponibles, FTE asignados, capacidad de guardias y brechas de habilidades por equipo; no evalúa personas individuales.</p></div>${mini('+ Registrar capacidad de equipo','team')}</div>
- ${state.teamCapacities.length?'<div class="table-wrap"><table class="data-table"><thead><tr><th>EQUIPO / VERTICAL</th><th>ASIGNACIÓN / DISPONIBILIDAD</th><th>CARGA DE TRABAJO</th><th>COBERTURA</th><th>BRECHAS / SITUACIÓN</th></tr></thead><tbody>'+
- state.teamCapacities.map(t=>{const z=teamStatus(t);return `<tr><td><span class="cell-title">${esc(t.name)}</span><span class="cell-meta">${esc(getVertical(t.verticalId)?.name||'')} · ${esc(t.owner)}</span></td><td>${nfmt(t.allocatedFte)} / ${nfmt(t.availableFte)} FTE</td><td>${fmtPct(z.utilization)}<span class="cell-meta">Umbral de carga: ${nfmt(z.threshold)}%</span></td><td>${fmtPct(z.coverage)}</td><td>${tag(z.warning?'Requiere atención':'Dentro del umbral',z.warning?'amber':'neutral')}<span class="cell-meta">${esc(t.skillsGap||'Sin brechas informadas')}</span></td></tr>`;}).join('')+'</tbody></table></div>':empty('Sin registros de equipos','Registrá disponibilidad, asignación y cobertura de los equipos por vertical.')}
- <div class="modal-note">Si la carga alcanza el umbral, o la cobertura de guardias cae por debajo del 90%, se genera automáticamente un riesgo asociado al equipo. Los FTE son capacidad del área, no indicadores de desempeño individual.</div></section>`;
+ const rows=state.capacities.map(c=>{
+   const x=capacityStatus(c),signal=infrastructureSignal(c);
+   return `<tr><td><span class="cell-title">${esc(c.name)}</span><span class="cell-meta">${esc(getVertical(c.verticalId)?.name||'')} · ${esc(c.owner)}</span></td><td class="number">${nfmt(c.used)} / ${nfmt(c.total)} ${esc(c.unit)}</td>
+   <td><strong class="number">${fmtPct(x.utilization)}</strong>${percentBar(x.utilization,signal,x.limit)}<span class="cell-meta">Umbral: ${nfmt(x.limit)} %</span></td>
+   <td class="${x.futureWarning?'text-warn':'text-good'}">${fmtPct(x.forecast)}<span class="cell-meta">Crecimiento mensual: ${nfmt(c.growthPct)}%</span></td><td>${semaphore(signal)}</td></tr>`;
+ }).join('');
+ const teamRows=state.teamCapacities.map(t=>{
+   const x=teamStatus(t),signal=workforceSignal(t);
+   return `<tr><td><span class="cell-title">${esc(t.name)}</span><span class="cell-meta">${esc(getVertical(t.verticalId)?.name||'')} · ${esc(t.owner)}</span></td><td>${nfmt(t.allocatedFte)} / ${nfmt(t.availableFte)} FTE</td>
+   <td><strong class="number">${fmtPct(x.utilization)}</strong>${percentBar(x.utilization,signal,x.threshold)}</td>
+   <td><span class="number">${fmtPct(x.coverage)}</span><span class="cell-meta">${esc(t.skillsGap||'Sin brecha informada')}</span></td><td>${semaphore(signal)}</td></tr>`;
+ }).join('');
+ return `<div class="section-eyeline">01 / VISIÓN DE CAPACIDAD POR RECURSO</div>
+ ${preview?'<div class="capacity-card-grid">'+preview+'</div>':empty('Sin mediciones','Registrá capacity de infraestructura para ver niveles y proyecciones.')}
+ <section class="panel"><div class="panel-head"><div><h2>Infraestructura · utilización y previsión</h2><p>Utilización comparada con el umbral de cada recurso; la proyección a tres meses supone crecimiento mensual constante.</p></div>${mini('+ Nueva medición','capacity')}</div>
+ ${rows?'<div class="table-wrap"><table class="data-table"><thead><tr><th>RECURSO / VERTICAL</th><th>USO Y CAPACIDAD</th><th>UTILIZACIÓN Y UMBRAL</th><th>PROYECCIÓN</th><th>SEMÁFORO</th></tr></thead><tbody>'+rows+'</tbody></table></div>':empty('Sin mediciones','Agregá un recurso para registrar uso, límite y crecimiento.')}
+ <p class="mini-glossary">Semáforo: rojo cuando se alcanza el umbral individual; ámbar si faltan 10 puntos porcentuales o menos, o si la proyección a tres meses alcanza el umbral; verde en los demás casos.</p>
+ <div class="modal-note">Una medición nueva sobre el umbral genera un riesgo vinculado. Los valores son registros manuales, no telemetría en vivo.</div></section>
+ <section class="panel"><div class="panel-head"><div><h2>Equipos · carga y cobertura operativa</h2><p>FTE asignados, disponibles, brechas de habilidad y cobertura. La evaluación es de capacidad organizacional, no de personas.</p></div>${mini('+ Registrar capacidad de equipo','team')}</div>
+ ${teamRows?'<div class="table-wrap"><table class="data-table"><thead><tr><th>EQUIPO / VERTICAL</th><th>FTE ASIGNADOS / DISPONIBLES</th><th>CARGA / UMBRAL</th><th>COBERTURA Y BRECHAS</th><th>ESTADO</th></tr></thead><tbody>'+teamRows+'</tbody></table></div>':empty('Sin capacidad de equipos','Registrá equipos para analizar dotación y cobertura.')}
+ <p class="mini-glossary">Rojo: carga al umbral o cobertura inferior a 90%. Ámbar: carga dentro de 10 puntos del umbral o cobertura inferior a 95%.</p></section>`;
 }
 function assessmentsView(){
  const rows=state.assessments.map(a=>{
