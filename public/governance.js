@@ -248,26 +248,62 @@ function actionsView(){
   <div class="modal-note">Rojo = vencida o bloqueada. Ámbar = vence en siete días o menos. Verde = dentro de plazo o completada con evidencia. Gris = información insuficiente.</div></section>`;
 }
 function continuityView(){
+ const ts=today(),critical=state.services.filter(s=>Number(s.criticality)===1);
+ const approved=critical.filter(s=>serviceSignal(s,ts).level==='ok').length;
+ const breaching=state.services.filter(s=>availability(s)!==null&&availability(s)<Number(s.targetPct)).length;
+ const noEvidence=critical.filter(s=>serviceSignal(s,ts).level==='unknown').length;
  const rows=state.services.map(s=>{
-  const a=availability(s),pass=a!==null&&a>=Number(s.targetPct),c=continuity(s);
+  const a=availability(s),pass=a!==null&&a>=Number(s.targetPct),signal=serviceSignal(s,ts);
+  const sla=a===null?{level:'unknown',label:'Sin evaluar',reason:'Sin minutos válidos'}:
+    pass?{level:'ok',label:'En control',reason:'Disponibilidad observada dentro del SLA'}:
+    {level:'critical',label:'Crítico',reason:'Disponibilidad inferior al SLA'};
   return `<tr><td><span class="cell-title">${esc(s.name)}</span><span class="cell-meta">${esc(getVertical(s.verticalId)?.name||'')} · Criticidad ${esc(s.criticality)}</span></td>
-  <td><span class="number ${pass?'text-good':'text-danger'}">${fmtPct(a)}</span><span class="cell-meta">Objetivo SLA: ${nfmt(s.targetPct)}%</span><span class="cell-meta">Período: ${nfmt(s.periodMinutes)} min</span></td>
-  <td>${nfmt(s.downtimeMinutes)} min<span class="cell-meta">Registrados en el período</span></td><td>RTO ${nfmt(s.rtoMin)} / RPO ${nfmt(s.rpoMin)} min</td>
-  <td>${tag(c.label,c.ok?'neutral':'amber')}<span class="cell-meta">Última prueba: ${esc(s.lastDRTest||'Sin registro')}</span></td><td>${mini('Actualizar','service',s.id)}</td></tr>`;
+  <td><span class="number">${fmtPct(a)}</span><span class="cell-meta">Objetivo: ${nfmt(s.targetPct)}% · período ${nfmt(s.periodMinutes)} min</span>${semaphore(sla)}</td>
+  <td><span class="number">${nfmt(s.downtimeMinutes)} min</span><span class="cell-meta">Interrupciones registradas</span></td>
+  <td>RTO ${nfmt(s.rtoMin)} min<span class="cell-meta">RPO ${nfmt(s.rpoMin)} min</span></td>
+  <td>${semaphore(signal)}<span class="cell-meta">${esc(s.lastDRTest||'Sin fecha de prueba')} · ${esc(s.drResult)}</span></td>
+  <td>${mini('Actualizar','service',s.id)}</td></tr>`;
  }).join('');
- return `<section class="panel"><div class="panel-head"><div><h2>Disponibilidad registrada y preparación de DR</h2><p>Disponibilidad calculada por servicio (minutos del período vs. minutos de caída) y resultado de pruebas.</p></div>${mini('+ Agregar servicio','service')}</div>
- ${rows?'<div class="table-wrap"><table class="data-table"><thead><tr><th>SERVICIO</th><th>DISPONIBILIDAD / SLA</th><th>INDISPONIBILIDAD</th><th>OBJETIVOS</th><th>CONTINUIDAD</th><th>OPERAR</th></tr></thead><tbody>'+rows+'</tbody></table></div>':empty('Sin servicios','Registrá servicios y mediciones para calcular disponibilidad.')}
- <div class="modal-note">Los datos de demostración son ficticios. Disponibilidad = (minutos del período − minutos de caída) / minutos del período. La aprobación DR se registra por separado: una buena disponibilidad no equivale a continuidad probada.</div></section>`;
+ const all=state.services.map(availability).filter(x=>x!==null);
+ const mean=all.length?all.reduce((x,y)=>x+y,0)/all.length:null;
+ return `<div class="executive-microline">
+  <div><span class="micro-label">DISPONIBILIDAD MEDIA REGISTRADA</span><strong>${fmtPct(mean)}</strong><small>Promedio simple entre servicios; sin ponderación por criticidad</small></div>
+  <div><span class="micro-label">SLA INCUMPLIDOS</span><strong>${breaching}</strong>${semaphore(breaching?{level:'critical',label:'Crítico',reason:'Objetivos SLA excedidos'}:{level:all.length?'ok':'unknown',label:all.length?'En control':'Sin evaluar',reason:'Cumplimiento de SLA'})}<small>Disponibilidad medida menor a objetivo</small></div>
+  <div><span class="micro-label">DR CRÍTICO VIGENTE / TOTAL</span><strong>${critical.length?approved+'/'+critical.length:'S/D'}</strong><small>${noEvidence} crítico(s) sin evaluación DR · Vigencia ilustrativa de 180 días</small></div>
+ </div>
+ <section class="panel"><div class="panel-head"><div><h2>Servicios críticos, disponibilidad y DRP</h2><p>Dos mediciones independientes: disponibilidad durante un período y capacidad de recuperación validada. El semáforo DRP no supone cumplimiento real del RTO/RPO.</p></div>${mini('+ Agregar servicio','service')}</div>
+  ${rows?'<div class="table-wrap"><table class="data-table"><thead><tr><th>SERVICIO</th><th>DISPONIBILIDAD Y SLA</th><th>CAÍDA REGISTRADA</th><th>RTO / RPO OBJETIVO</th><th>CONTINUIDAD / DRP</th><th>ACTUALIZAR</th></tr></thead><tbody>'+rows+'</tbody></table></div>':empty('Sin servicios','Registrá servicios para evaluar SLA y continuidad.')}
+  <div class="modal-note">Rojo si SLA incumplido o DR fallido; ámbar si prueba parcial o si una prueba aprobada supera 180 días; verde si ambas dimensiones están dentro de sus supuestos; gris si no hay evidencia suficiente. Los 180 días son una política ilustrativa, no una certificación de continuidad.</div></section>`;
 }
 function committeeView(){
- const rows=state.decisions.map(d=>{
- const risk=getRisk(d.riskId);
- return `<tr><td><span class="cell-title">${esc(d.title)}</span><span class="cell-meta">${risk?'Riesgo: '+esc(risk.title):'Decisión general'}</span></td><td>${esc(d.owner)}</td><td>${esc(d.dueDate)}</td>
- <td>${tag(d.status==='resuelta'?'Resuelta':'Pendiente',d.status==='resuelta'?'neutral':'amber')}</td><td>${d.status==='pendiente'?mini('Registrar resolución','decision-close',d.id):tag('Con evidencia','neutral')}</td></tr>`;
- }).join('');
- return `<section class="panel"><div class="panel-head"><div><h2>Decisiones del Comité de Tecnología</h2><p>Compromisos ejecutivos con responsable, plazo, riesgo asociado y evidencia de resolución.</p></div>${mini('+ Nueva decisión','decision')}</div>
- ${rows?'<div class="table-wrap"><table class="data-table"><thead><tr><th>DECISIÓN</th><th>RESPONSABLE</th><th>FECHA OBJETIVO</th><th>ESTADO</th><th>SEGUIMIENTO</th></tr></thead><tbody>'+rows+'</tbody></table></div>':empty('Sin decisiones','Registrá un compromiso para llevar seguimiento de comité.')}
- </section>`;
+ const ts=today();
+ const pending=state.decisions.filter(d=>d.status==='pendiente');
+ const resolved=state.decisions.filter(d=>d.status==='resuelta');
+ const getSignal=d=>actionSignal({...d,status:d.status==='resuelta'?'completada':'pendiente'},ts);
+ const card=d=>{
+  const risk=getRisk(d.riskId);
+  return `<div class="board-decision"><div class="board-decision-title">${esc(d.title)}</div><div>${semaphore(getSignal(d))}</div>
+   <div class="cell-meta">${risk?'Riesgo: '+esc(risk.title):'Decisión sin riesgo asociado'}</div>
+   <div class="board-decision-foot"><span>${esc(d.owner)} · ${esc(d.dueDate)}</span>${d.status==='pendiente'?mini('Registrar resolución','decision-close',d.id):tag('Evidencia registrada','neutral')}</div></div>`;
+ };
+ const overdue=pending.filter(d=>getSignal(d).level==='critical').length;
+ return `<div class="executive-summary signal-border-${overdue?'critical':pending.length?'warning':'ok'}">
+  <div class="executive-summary-upper">
+   <div><span class="executive-overline">TECHNOLOGY STEERING COMMITTEE / BOARD EDITION</span><h2>Decisiones con responsables y resultados</h2>
+   <p class="executive-summary-text">${pending.length?pending.length+' compromiso(s) pendiente(s), de los cuales '+overdue+' están vencidos. Priorizar los bloqueos y decisiones con exposición en servicios críticos.':'No hay compromisos pendientes registrados. Revisar la vigencia de riesgos y acuerdos antes del siguiente comité.'}</p>
+   <div class="summary-footnotes"><span>Registro local de compromisos</span><span>Las resoluciones requieren evidencia</span></div></div>
+   <div class="summary-aside"><div class="summary-aside-header">DECISIONES ABIERTAS</div><div class="summary-aside-value">${pending.length}</div><span>Compromisos por resolver</span></div>
+  </div></div>
+  <div class="section-eyeline">01 / AGENDA Y RESOLUCIONES DE COMITÉ</div>
+  <div class="board-columns">
+    <section class="board-column"><div class="board-column-head">PENDIENTES <span class="board-count">${pending.length}</span></div>${pending.length?pending.map(card).join(''):empty('Sin decisiones pendientes','No hay compromisos abiertos registrados.')}</section>
+    <section class="board-column"><div class="board-column-head">RESUELTAS <span class="board-count">${resolved.length}</span></div>${resolved.length?resolved.map(card).join(''):empty('Sin cierres registrados','Las resoluciones con evidencia aparecen aquí.')}</section>
+  </div>
+  <div class="section-eyeline">02 / ADMINISTRACIÓN DE COMPROMISOS</div>
+  <section class="panel"><div class="panel-head"><div><h2>Agenda ejecutiva y seguimiento</h2><p>Registrá acuerdos con responsable, vencimiento, riesgo relacionado y constancia de resolución.</p></div>${mini('+ Nueva decisión','decision')}</div>
+   ${state.decisions.length?'<div class="table-wrap"><table class="data-table"><thead><tr><th>DECISIÓN</th><th>RESPONSABLE</th><th>PLAZO</th><th>ESTADO</th><th>GESTIÓN</th></tr></thead><tbody>'+
+    state.decisions.map(d=>`<tr><td><span class="cell-title">${esc(d.title)}</span><span class="cell-meta">${getRisk(d.riskId)?'Riesgo: '+esc(getRisk(d.riskId).title):'Decisión general'}</span></td><td>${esc(d.owner)}</td><td>${esc(d.dueDate)}</td><td>${semaphore(getSignal(d))}</td><td>${d.status==='pendiente'?mini('Registrar resolución','decision-close',d.id):tag('Con evidencia','neutral')}</td></tr>`).join('')+'</tbody></table></div>':empty('Sin decisiones','Registrá un compromiso para iniciar el seguimiento.')}
+  </section>`;
 }
 function render(){
  const meta=viewMeta[view]||viewMeta.overview;
