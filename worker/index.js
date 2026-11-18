@@ -5,8 +5,8 @@ import {verifyAccessToken, AccessError} from './auth.js';
 
 // API V5 aislada del frontend V4. No se publica ni conecta sin Access y D1.
 const ROLES = Object.freeze({
-  owner: ['read','write','members','privileged-members','audit'],
-  admin: ['read','write','members','audit'],
+  owner: ['read','write','members','privileged-members','audit','restore'],
+  admin: ['read','write','members','audit','restore'],
   editor: ['read','write'],
   auditor: ['read','audit'],
   viewer: ['read']
@@ -93,6 +93,21 @@ async function getWorkspace(db, tenantId, id) {
   if (!row) throw new ApiError('Workspace inexistente', 404);
   return row;
 }
+
+function storeRevision(db,tenantId,workspaceId,revision,email,at,auditId) {
+  return db.prepare(
+    'INSERT INTO atlas_workspace_revisions(tenant_id,workspace_id,revision,state_json,actor_email,created_at) '+
+    'SELECT ?,?,?,w.state_json,?,? FROM atlas_workspaces w WHERE w.id=? AND w.tenant_id=? AND w.revision=? '+
+    'AND EXISTS(SELECT 1 FROM atlas_audit_events WHERE id=?)'
+  ).bind(tenantId,workspaceId,revision,email,at,workspaceId,tenantId,revision,auditId);
+}
+function pruneRevisions(db,tenantId,workspaceId,auditId) {
+  return db.prepare(
+    'DELETE FROM atlas_workspace_revisions WHERE tenant_id=? AND workspace_id=? '+
+    'AND EXISTS(SELECT 1 FROM atlas_audit_events WHERE id=?) '+
+    'AND revision NOT IN(SELECT revision FROM atlas_workspace_revisions WHERE tenant_id=? AND workspace_id=? ORDER BY revision DESC LIMIT 5)'
+  ).bind(tenantId,workspaceId,auditId,tenantId,workspaceId);
+}
 const publicWorkspace = row => ({id:row.id,name:row.name,revision:row.revision,
   state:JSON.parse(row.state_json),updatedAt:row.updated_at,updatedBy:row.updated_by});
 function originCheck(request) {
@@ -150,7 +165,8 @@ export function createHandler({verify = verifyAccessToken} = {}) {
           db.prepare('INSERT INTO atlas_workspaces(id,tenant_id,name,revision,state_json,created_by,updated_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)')
             .bind(id,tenantId,name,1,JSON.stringify(state),identity.email,identity.email,now,now),
           db.prepare('INSERT INTO atlas_audit_events(id,tenant_id,workspace_id,actor_email,action,previous_revision,new_revision,metadata_json,occurred_at) VALUES(?,?,?,?,?,?,?,?,?)')
-            .bind(auditId,tenantId,id,identity.email,'workspace.created',null,1,JSON.stringify({name}),now)
+            .bind(auditId,tenantId,id,identity.email,'workspace.created',null,1,JSON.stringify({name}),now),
+          storeRevision(db,tenantId,id,1,identity.email,now,auditId)
         ]);
         return reply({id,name,revision:1},201);
       }
@@ -165,20 +181,60 @@ export function createHandler({verify = verifyAccessToken} = {}) {
         if (!Number.isSafeInteger(expected) || expected<1) throw new ApiError('Revisión esperada obligatoria');
         await getWorkspace(db,tenantId,path[5]);
         const state=normalizeState(data.state);
-        const now=new Date().toISOString(),newRevision=expected+1;
+        const now=new Date().toISOString(),newRevision=expected+1,auditId=crypto.randomUUID();
         // D1.batch ejecuta las instrucciones en una única transacción.
         // Verificar la revisión ANTES de actualizar evita auditar escrituras rechazadas.
         const outcome=await db.batch([
           db.prepare('INSERT INTO atlas_audit_events(id,tenant_id,workspace_id,actor_email,action,previous_revision,new_revision,metadata_json,occurred_at) SELECT ?,?,?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM atlas_workspaces WHERE id=? AND tenant_id=? AND revision=?)')
-            .bind(crypto.randomUUID(),tenantId,path[5],identity.email,'workspace.updated',expected,newRevision,
+            .bind(auditId,tenantId,path[5],identity.email,'workspace.updated',expected,newRevision,
               JSON.stringify({kind:state.kind,risks:state.risks.length,actions:state.actions.length,incidents:state.incidents.length}),
               now,path[5],tenantId,expected),
           db.prepare('UPDATE atlas_workspaces SET state_json=?,revision=revision+1,updated_by=?,updated_at=? WHERE id=? AND tenant_id=? AND revision=?')
-            .bind(JSON.stringify(state),identity.email,now,path[5],tenantId,expected)
+            .bind(JSON.stringify(state),identity.email,now,path[5],tenantId,expected),
+          storeRevision(db,tenantId,path[5],newRevision,identity.email,now,auditId),
+          pruneRevisions(db,tenantId,path[5],auditId)
         ]);
         if (outcome[1]?.meta?.changes !== 1)
           throw new ApiError('Conflicto de edición: recargá el workspace antes de guardar',409);
         return reply({id:path[5],revision:newRevision,updatedAt:now});
+      }
+      if (resource==='workspaces' && path.length===7 && path[6]==='revisions' && request.method==='GET') {
+        requirePermission(member.role,'audit');
+        await getWorkspace(db,tenantId,path[5]);
+        const rows=await db.prepare(
+          'SELECT revision,actor_email,created_at FROM atlas_workspace_revisions WHERE tenant_id=? AND workspace_id=? ORDER BY revision DESC LIMIT 5'
+        ).bind(tenantId,path[5]).all();
+        return reply({workspaceId:path[5],revisions:rows.results,retained:5});
+      }
+      if (resource==='workspaces' && path.length===9 && path[6]==='revisions' && path[8]==='restore' && request.method==='PUT') {
+        requirePermission(member.role,'restore');
+        const target=Number(path[7]);
+        if (!Number.isSafeInteger(target) || target<1) throw new ApiError('Revisión histórica inválida',400);
+        const data=await readBody(request);
+        const expected=data.revision;
+        if (!Number.isSafeInteger(expected) || expected<1) throw new ApiError('Revisión actual esperada obligatoria',400);
+        await getWorkspace(db,tenantId,path[5]);
+        const historic=await db.prepare(
+          'SELECT revision FROM atlas_workspace_revisions WHERE tenant_id=? AND workspace_id=? AND revision=?'
+        ).bind(tenantId,path[5],target).first();
+        if (!historic) throw new ApiError('La revisión no está en el historial retenido',404);
+        const now=new Date().toISOString(),newRevision=expected+1,auditId=crypto.randomUUID();
+        const results=await db.batch([
+          db.prepare(
+            'INSERT INTO atlas_audit_events(id,tenant_id,workspace_id,actor_email,action,previous_revision,new_revision,metadata_json,occurred_at) '+
+            'SELECT ?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM atlas_workspaces WHERE tenant_id=? AND id=? AND revision=?)'
+          ).bind(auditId,tenantId,path[5],identity.email,'workspace.restored',expected,newRevision,
+            JSON.stringify({sourceRevision:target}),now,tenantId,path[5],expected),
+          db.prepare(
+            'UPDATE atlas_workspaces SET state_json=(SELECT state_json FROM atlas_workspace_revisions WHERE tenant_id=? AND workspace_id=? AND revision=?), '+
+            'revision=revision+1,updated_by=?,updated_at=? WHERE id=? AND tenant_id=? AND revision=?'
+          ).bind(tenantId,path[5],target,identity.email,now,path[5],tenantId,expected),
+          storeRevision(db,tenantId,path[5],newRevision,identity.email,now,auditId),
+          pruneRevisions(db,tenantId,path[5],auditId)
+        ]);
+        if (results[1]?.meta?.changes !== 1)
+          throw new ApiError('Conflicto de edición: recargá el workspace antes de restaurar',409);
+        return reply({id:path[5],revision:newRevision,restoredFrom:target,updatedAt:now});
       }
       if (resource==='audit' && path.length===5 && request.method==='GET') {
         requirePermission(member.role,'audit');
