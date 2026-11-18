@@ -23,6 +23,9 @@ jobs:
       - name: Verificación de archivos generados
         run: |
           test -f dist/index.html
+          test -f dist/v5-ui.js
+          test -f dist/remote-workspaces.js
+          test -f dist/remote-workspaces.css
           test -f dist/governance.js
           test -f dist/governance.css
           test -f dist/lib/governance/core.js
@@ -50,6 +53,8 @@ jobs:
         run: node scripts/browser-smoke.mjs
       - name: Probar gobierno, riesgos, planes y persistencia en Chromium
         run: node scripts/governance-smoke.mjs
+      - name: Probar V5: sesión remota, permisos, conflictos y recuperación local
+        run: node scripts/v5-browser-smoke.mjs
       - name: Guardar capturas de pantalla de revisión
         if: always()
         uses: actions/upload-artifact@v4
