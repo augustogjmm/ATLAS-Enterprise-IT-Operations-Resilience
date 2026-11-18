@@ -341,6 +341,11 @@ const drOptions=[['sin-evaluar','Sin evaluar'],['aprobado','Prueba aprobada'],['
 
 function openForm(type,id=''){
  if(type.startsWith('view:')){switchView(type.slice(5));return;}
+ if(type==='seed-performance'){
+  if(state.kpis.length||state.objectives.length||state.keyResults.length)return notice('Ya hay indicadores o objetivos; los ejemplos no sobrescribirán registros.',true);
+  if(!confirm('¿Agregar KPI y OKR de ejemplo sin modificar tus riesgos, servicios ni acciones? Las líneas base son ilustrativas.'))return;
+  seedDemoPerformance(state);addEvent(state,'okr','Se agregaron KPI y OKR de demostración sin modificar los registros operativos.',today());save('KPI y OKR de ejemplo agregados.');return;
+ }
  const v=vertOptions(),r=riskOptions();let title,description='',fields='',submit='Guardar registro';
  if(type==='kpi'){title='Nuevo KPI tecnológico';description='Indicadores corporativos calculados automáticamente a partir de registros de ATLAS; elegí la fórmula y la meta.';fields=select('metric','Indicador y fórmula',KPI_OPTIONS)+input('name','Nombre ejecutivo del KPI','text','',{required:true,wide:true})+input('target','Meta','number','',{required:true,step:'any'})+input('owner','Responsable de seguimiento','text','',{required:true});}
  else if(type==='okr'){title='Nuevo objetivo tecnológico';description='El objetivo se mide mediante resultados clave vinculados a los KPI disponibles.';fields=input('title','Objetivo estratégico','text','',{required:true,wide:true})+input('owner','Responsable del objetivo','text','',{required:true})+select('verticalId','Alcance',[['','Corporativo'],...vertOptions()])+input('startDate','Inicio','date',today(),{required:true})+input('dueDate','Fecha objetivo','date','',{required:true});}
