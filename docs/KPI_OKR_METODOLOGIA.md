@@ -25,6 +25,16 @@ Todos los datos iniciales son ficticios; los ejemplos no representan resultados 
 
 **No implementado:** MTTR, MTBF, disponibilidad ponderada, SLA calculado desde incidentes CSV y presupuestos reales. No se incorporan cifras sintéticas para simular dichos KPI.
 
+## KPI ITSM incorporados en V3
+
+| Código | Indicador | Fórmula / definición | Dirección |
+|---|---|---|---|
+| `mttr_90d` | MTTR (90 días) | Promedio de minutos entre apertura y resolución de tickets cerrados en los últimos 90 días | Menor |
+| `critical_incidents_30d` | P1/P2 (30 días) | Número de tickets P1/P2 ingresados durante los últimos 30 días, resueltos o abiertos | Menor |
+| `open_incidents` | Incidentes pendientes | Tickets sin fecha de resolución | Menor |
+
+La versión V3 ofrece **13 KPI**. Los tres nuevos derivan exclusivamente de los incidentes cargados en el navegador. MTTR no equivale a duración de caída del servicio y no altera los indicadores SLA ni la disponibilidad registrada. Ver [contrato CSV y metodología MTTR](INCIDENTES_MTTR_CSV.md).
+
 ## Evaluación de metas
 
 Cada KPI posee nombre, métrica predefinida, meta y responsable. Sus unidades y dirección de mejora provienen del catálogo.
