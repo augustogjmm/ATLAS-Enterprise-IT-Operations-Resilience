@@ -1,8 +1,11 @@
 name: ATLAS · Calidad y reproducibilidad
 on:
   push:
-    branches: [main, feature/**]
+    branches: [main]
   pull_request:
+concurrency:
+  group: atlas-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
