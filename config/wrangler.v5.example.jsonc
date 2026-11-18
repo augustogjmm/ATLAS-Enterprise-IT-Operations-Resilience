@@ -1,0 +1,23 @@
+{
+  // ATLAS V5: PLANTILLA, NO DESPLEGAR SIN REVISIÓN.
+  // Crear otro Worker para NO modificar V4 publicada.
+  "name": "atlas-enterprise-v5",
+  "main": "./worker/index.js",
+  "compatibility_date": "2026-11-18",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "ATLAS_DB",
+      "database_name": "atlas-v5",
+      "database_id": "REEMPLAZAR_UUID_REAL_D1"
+    }
+  ],
+  "vars": {
+    "ACCESS_TEAM_DOMAIN": "https://REEMPLAZAR.cloudflareaccess.com",
+    "ACCESS_AUD": "REEMPLAZAR_AUD_DE_ACCESS"
+  }
+}
