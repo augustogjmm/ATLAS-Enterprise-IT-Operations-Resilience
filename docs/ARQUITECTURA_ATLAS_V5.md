@@ -96,12 +96,25 @@ Referencias oficiales:
 5. Crear D1 nueva (después de la autorización), ejecutar `migrations/0001_atlas_v5.sql` con protección de datos. Provisionar en forma controlada un registro en `atlas_tenants` y una membresía inicial `owner` de correo autorizado.
 6. Activar Cloudflare Access para **V5 únicamente**, con lista de correos autorizados y audiencia propia; restringir producción y previews.
 7. Probar denegación sin JWT, acceso de editor/viewer/auditor, revocación, fuga entre organizaciones, conflicto 409 y exportación/recuperación de respaldo.
-8. Conectar la UI V4 a la API bajo **modo multiusuario explícito**, sin sobrescribir `localStorage` ni migrar automáticamente. Incorporar selector de organización/workspace, tratamiento visible de conflictos y diálogo de importación.
+8. **Implementado en la rama V5:** UI de conexión explícita y selección de organización/workspace, edición con revisión, modo solo lectura, consulta de auditoría y miembros, exportación ante conflictos y confirmación al crear un workspace copiando V4. Se utiliza el `localStorage` V4 solo en modo local; no hay migración silenciosa. La UI de administración de roles es funcional pero provisional (diálogos nativos), pendiente de rediseño para la experiencia ejecutiva.
 9. Desplegar V5 solo después de validar el circuito completo. Mantener rollback a V4 y procedimientos de respaldo y restauración.
 
-**Punto de avance actual:** infraestructura lógica, controles de acceso, esquema SQL, API y pruebas; **integración visual de workspace remoto, activación de Access, provisionamiento D1 y publicación V5 quedan pendientes**.
+**Punto de avance actual:** API, esquema SQL, autenticación firmada, autorización RBAC, aislamiento de organizaciones, interfaz opt-in V5 y pruebas automatizadas de navegador **implementadas en la rama de desarrollo**. CI validó **70 pruebas de Node y dos suites V4 más una suite V5 de Chromium**. Pendiente: activar Access, crear y provisionar D1 (previa autorización), probar endpoints sobre recursos Cloudflare reales, revisión de seguridad y despliegue independiente. La V4 pública no se modificó.
 
-### 7. Gobierno técnico de V5
+### 7. Comportamiento de la interfaz opt-in
+
+- La pantalla pública se abre en **V4 local**, sin solicitudes a `/api/v1` en el arranque.
+- «Conectar V5» ejecuta la verificación de sesión. Recién entonces se listan organizaciones y workspaces permitidos.
+- «Abrir workspace» carga un snapshot compartido y su revisión. Navegación, formularios, KPI y CSV reutilizan el motor funcional V4, pero los guardados se envían al Worker.
+- En un workspace remoto de lectura, los formularios se bloquean visualmente, además de estar prohibidos por el servidor. El rol se consulta desde la API y nunca se considera suficiente para autorizar operaciones de backend.
+- Las modificaciones remotas se serializan: mientras se guarda una revisión, se bloquean nuevas escrituras. La operación solo se confirma visualmente tras recibir respuesta del servidor.
+- Ante HTTP 409 o fallo que impida confirmar la escritura, se suspenden más cambios remotos, se conservan los datos editados en memoria y se ofrece exportación JSON. Recargar o volver al modo local requiere confirmación.
+- «Volver a V4 local» recupera el snapshot local preexistente, sin escribir en D1 ni borrar archivos `localStorage`.
+- «Crear workspace» admite comenzar vacío. La copia de registros locales requiere dos confirmaciones explícitas para evitar transmisión accidental de datos.
+
+**Límites de esta etapa:** no hay sincronización en vivo, resolución automática de conflictos, aprobaciones multiusuario por flujo, firma inmutable de actas ni pruebas contra Cloudflare Access/D1 reales. Los metadatos de auditoría se escriben en D1 solo después de instalarlo y provisionarlo. Las pruebas de navegador utilizan una API simulada con respuestas controladas.
+
+### 8. Gobierno técnico de V5
 
 - **Seguridad:** acceso por mínimo privilegio; no cargar datos bancarios ni personales en la demo; no usar contraseñas caseras ni secretos en código.
 - **Cambios:** PR con revisión y CI, sin despliegue automático desde esta rama y sin push directo a `main`.
