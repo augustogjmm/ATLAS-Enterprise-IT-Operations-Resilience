@@ -29,7 +29,9 @@ try{
     const page=await browser.newPage({viewport:{width:1300,height:850},acceptDownloads:true});
     page.on('pageerror',e=>errors.push(e.message));
     const requests=[];
-    let revision=1, conflict=false, stored=createDemo();
+    const historical=createDemo();
+    let revision=role==='owner'?2:1, conflict=false, stored=createDemo();
+    if(role==='owner')stored.verticals.push({id:'v-owner-added',name:'Restaurar después',owner:'IT',description:'Prueba V5'});
     const tenant='org-demo',id='ws-demo';
     await page.route('**/api/v1/**',async route=>{
       const req=route.request(),url=new URL(req.url()),method=req.method(),path=url.pathname;
@@ -41,6 +43,17 @@ try{
         data={role,workspaces:[{id,name:'Gobierno Compartido',revision}]};
       else if(path==='/api/v1/tenants/'+tenant+'/workspaces/'+id&&method==='GET')
         data={id,name:'Gobierno Compartido',revision,state:stored};
+      else if(path==='/api/v1/tenants/'+tenant+'/workspaces/'+id+'/revisions'&&method==='GET'){
+        if(['owner','admin','auditor'].includes(role))
+          data={revisions:[{revision,actor_email:'owner@example.test',created_at:'2026-11-18T12:00:00Z'},...(revision>1?[{revision:1,actor_email:'owner@example.test',created_at:'2026-11-18T11:00:00Z'}]:[])],retained:5};
+        else{status=403;data={error:'Permiso insuficiente'};}
+      }
+      else if(path==='/api/v1/tenants/'+tenant+'/workspaces/'+id+'/revisions/1/restore'&&method==='PUT'){
+        const received=req.postDataJSON();
+        if(!['owner','admin'].includes(role)){status=403;data={error:'Rol insuficiente'};}
+        else if(received.revision!==revision){status=409;data={error:'Conflicto de revisión'};}
+        else{stored=structuredClone(historical);revision++;data={id,revision,restoredFrom:1};}
+      }
       else if(path==='/api/v1/tenants/'+tenant+'/workspaces/'+id&&method==='PUT'){
         const received=req.postDataJSON();
         if(role==='viewer'){status=403;data={error:'Permiso insuficiente'};}
@@ -98,10 +111,29 @@ try{
   assert.equal(await viewer.page.locator('[data-open="vertical"]').first().isDisabled(),true,
     'Viewer no debe poder abrir formularios de edición');
   assert.equal(await viewer.page.locator('[data-workspace-command="create"]').isDisabled(),true);
+  assert.equal(await viewer.page.locator('[data-workspace-command="history"]').count(),0);
   await viewer.page.close();
 
+  const owner=await setup('owner');
+  await owner.page.locator('[data-workspace-command="connect"]').click();
+  await owner.page.locator('[data-workspace-command="open"]').waitFor();
+  await owner.page.locator('[data-workspace-command="open"]').click();
+  await owner.page.getByText('Compartido: Gobierno Compartido').waitFor();
+  assert.equal(owner.revision(),2);
+  assert.ok(owner.stored().verticals.some(x=>x.id==='v-owner-added'));
+  await owner.page.locator('[data-workspace-command="history"]').click();
+  await owner.page.locator('#workspace-restore-revision').waitFor();
+  assert.equal(await owner.page.locator('#workspace-restore-revision').inputValue(),'1');
+  owner.page.once('dialog',d=>d.accept());
+  await owner.page.locator('[data-workspace-command="restore"]').click();
+  await owner.page.waitForFunction(()=>document.querySelector('#workspace-panel')?.textContent?.includes('r3'));
+  assert.equal(owner.revision(),3);
+  assert.equal(owner.stored().verticals.some(x=>x.id==='v-owner-added'),false);
+  assert.ok(owner.requests.some(x=>x.path.endsWith('/revisions/1/restore')&&x.method==='PUT'));
+  await owner.page.close();
+
   assert.deepEqual(errors,[]);
-  console.log('OK V5: local intacto; sesión y workspace; escritura r2; conflicto 409; reversión local; viewer sin edición.');
+  console.log('OK V5: local intacto; sesión y workspace; escritura r2; conflicto 409; reversión local; viewer sin edición; historial y restauración owner r3.');
 }finally{
   await browser?.close();
   await new Promise(resolve=>server.close(resolve));
