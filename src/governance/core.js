@@ -6,7 +6,7 @@ export const DEMO_DATE = '2026-11-18';
 
 export function makeEmpty() {
   return { version: SCHEMA_VERSION, kind: 'local', verticals: [], services: [], assessments: [],
-    capacities: [], risks: [], actions: [], decisions: [], events: [] };
+    capacities: [], teamCapacities: [], risks: [], actions: [], decisions: [], events: [] };
 }
 
 export function createDemo() {
@@ -36,6 +36,12 @@ export function createDemo() {
     {id:'c-enlace',verticalId:'v-net',name:'Enlace principal',unit:'Gbps',used:6.2,total:10,growthPct:6,thresholdPct:80,owner:'Gerencia de Redes'},
     {id:'c-cloud',verticalId:'v-cloud',name:'Reserva de cómputo cloud',unit:'vCPU',used:142,total:200,growthPct:5,thresholdPct:80,owner:'Arquitectura Empresarial'}
   ];
+  state.teamCapacities = [
+    {id:'tc-infra',verticalId:'v-infra',name:'Operación de plataformas',availableFte:14,allocatedFte:12,coveragePct:95,thresholdPct:90,owner:'Gerencia de Infraestructura',skillsGap:'Documentación de turnos'},
+    {id:'tc-net',verticalId:'v-net',name:'Ingeniería de conectividad',availableFte:9,allocatedFte:7.5,coveragePct:92,thresholdPct:90,owner:'Gerencia de Redes',skillsGap:'Cobertura de reemplazos'},
+    {id:'tc-cloud',verticalId:'v-cloud',name:'Arquitectura híbrida',availableFte:6,allocatedFte:5,coveragePct:100,thresholdPct:90,owner:'Arquitectura Empresarial',skillsGap:'Reforzar observabilidad'},
+    {id:'tc-ops',verticalId:'v-ops',name:'Centro de operaciones',availableFte:16,allocatedFte:14,coveragePct:94,thresholdPct:90,owner:'Gerencia de Operaciones',skillsGap:'Entrenamiento DRP'}
+  ];
   state.risks = [
     {id:'r-san',verticalId:'v-infra',serviceId:'s-core',assessmentId:'as-1',capacityId:'c-san',title:'Saturación de almacenamiento crítico',description:'Capacidad utilizada por encima del umbral, con crecimiento mensual.',owner:'Gerencia de Infraestructura',probability:4,impact:5,status:'abierto',evidence:'',source:'assessment',createdAt:'2026-11-10'},
     {id:'r-net',verticalId:'v-net',serviceId:'s-network',assessmentId:'as-2',capacityId:'',title:'Recuperación de conectividad sin ensayo validado',description:'Dependencia de redundancia y pruebas de continuidad incompletas.',owner:'Gerencia de Redes',probability:3,impact:5,status:'abierto',evidence:'',source:'assessment',createdAt:'2026-11-13'},
@@ -58,7 +64,7 @@ export function createDemo() {
 export function assertValidState(state) {
   if (!state || typeof state !== 'object' || Array.isArray(state) || state.version !== SCHEMA_VERSION)
     throw new Error('Formato o versión de datos incompatible.');
-  const keys = ['verticals','services','assessments','capacities','risks','actions','decisions','events'];
+  const keys = ['verticals','services','assessments','capacities','teamCapacities','risks','actions','decisions','events'];
   for (const k of keys) {
     if (!Array.isArray(state[k]) || state[k].length > 3000) throw new Error('Datos incompletos en ' + k);
     const ids = new Set();
@@ -88,6 +94,36 @@ export function capacityStatus(asset) {
   return { utilization, forecast, limit, warning:utilization!==null && utilization>=limit,
     futureWarning:forecast!==null && forecast>=limit };
 }
+export function teamStatus(team) {
+  const utilization=pct(team.allocatedFte,team.availableFte);
+  const coverage=Number(team.coveragePct),threshold=Number(team.thresholdPct);
+  const understaffed=utilization!==null&&utilization>=threshold;
+  const coverageGap=Number.isFinite(coverage)&&coverage<90;
+  return {utilization,coverage,threshold,understaffed,coverageGap,warning:understaffed||coverageGap};
+}
+export function registerTeamCapacity(state,record,today,idFactory){
+  const utilization=pct(record.allocatedFte,record.availableFte);
+  const coverage=Number(record.coveragePct),limit=Number(record.thresholdPct);
+  if(utilization===null||!Number.isFinite(coverage)||coverage<0||coverage>100||!Number.isFinite(limit)||limit<=0||limit>100)
+    throw new Error('Revisá dotación, asignación, cobertura y umbral.');
+  if(!record.name?.trim()||!state.verticals.some(v=>v.id===record.verticalId))throw new Error('Equipo o vertical inválidos.');
+  const team={id:idFactory('tc'),verticalId:record.verticalId,name:record.name.trim(),
+    availableFte:Number(record.availableFte),allocatedFte:Number(record.allocatedFte),
+    coveragePct:coverage,thresholdPct:limit,owner:record.owner?.trim()||'Sin asignar',
+    skillsGap:record.skillsGap?.trim()||''};
+  state.teamCapacities.unshift(team);
+  addEvent(state,'team','Evaluación de capacidad del equipo '+team.name,today);
+  let risk=null;
+  if(teamStatus(team).warning){
+    risk={id:idFactory('r'),verticalId:team.verticalId,serviceId:'',assessmentId:'',capacityId:'',teamCapacityId:team.id,
+      title:'Capacidad de equipo comprometida: '+team.name,
+      description:'Carga '+utilization.toFixed(1)+'%; cobertura '+coverage+'%. Registrar plan de dotación, priorización o formación.',
+      owner:team.owner,probability:3,impact:4,status:'abierto',evidence:'',source:'team-capacity',createdAt:today};
+    state.risks.unshift(risk);
+    addEvent(state,'risk','Riesgo generado por capacidad o cobertura insuficiente de equipo',today);
+  }
+  return {team,risk};
+}
 export function severity(risk) {
   const p=Number(risk.probability),i=Number(risk.impact);
   if (!Number.isInteger(p)||!Number.isInteger(i)||p<1||p>5||i<1||i>5) throw new Error('Impacto y probabilidad entre 1 y 5.');
@@ -115,11 +151,12 @@ export function dashboard(state,today) {
   const criticalUnmanaged=unmanaged.filter(r=>severity(r).score>=15);
   const overdue=state.actions.filter(a=>actionOverdue(a,today));
   const capacityAlerts=state.capacities.filter(c=>capacityStatus(c).warning);
+  const teamAlerts=state.teamCapacities.filter(c=>teamStatus(c).warning);
   const drGaps=state.services.filter(s=>Number(s.criticality)===1&&!continuity(s).ok);
   const lowAssessments=state.assessments.filter(a=>Number(a.score)<=2);
   const avgAssessment=state.assessments.length?state.assessments.reduce((sum,a)=>sum+Number(a.score),0)/state.assessments.length:null;
   return {activeRisks:active.length,unmanaged:unmanaged.length,criticalUnmanaged:criticalUnmanaged.length,
-    overdue:overdue.length,capacityAlerts:capacityAlerts.length,drGaps:drGaps.length,
+    overdue:overdue.length,capacityAlerts:capacityAlerts.length,teamAlerts:teamAlerts.length,drGaps:drGaps.length,
     lowAssessments:lowAssessments.length,averageAssessment:avgAssessment,
     riskTreatmentPct:active.length?100*(active.length-unmanaged.length)/active.length:null};
 }
