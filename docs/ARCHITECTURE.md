@@ -1,63 +1,67 @@
-# ATLAS — Architecture and decision model
+# ATLAS — Arquitectura y modelo de decisiones
 
-> **Classification:** synthetic reference implementation; no real business or employer data.
+> **Clasificación:** aplicación demostrativa con datos ficticios, sin información empresarial real.
 
-## Purpose
+## Objetivo
 
-Present enterprise IT complexity in a form that a Head of IT, Infrastructure Manager, Technology Director or architecture governance board can interrogate. The first version is an **explainable simulation**, not a monitoring product.
+Representar decisiones de arquitectura, operaciones y continuidad que pueden abordar un Head of IT, Gerente de Infraestructura, Director de Tecnología o comité de gobierno de TI. El MVP es un **simulador explicable**, no una solución de monitoreo.
 
-## Logical layers
+## Capas de la solución
 
 ```text
-Browser (responsive command center)
-  ├── Scenario selector and executive KPIs
-  ├── Component grouping / dependency view
-  ├── Service recovery objective matrix
-  ├── Management investment comparisons
-  └── Downloadable synthetic evidence (JSON)
-          |
-          v
-Static deterministic domain model
-  ├── src/data.js    : assets, alternate dependency paths, services, incidents
-  └── src/engine.js  : blast-radius evaluation and recovery comparison
-          |
-          v
-No persistent backend / no secrets / no exchange APIs
+Navegador: centro de decisiones responsive
+  ├── Selección de escenarios e indicadores ejecutivos
+  ├── Topología por componentes y dependencias
+  ├── Matriz de objetivos de recuperación por servicio
+  ├── Comparación de alternativas de inversión
+  └── Exportación local de resultados ficticios (JSON)
+            |
+            v
+Modelo determinista de dominio
+  ├── src/data.js    : componentes, servicios, rutas, incidentes
+  └── src/engine.js  : análisis de impacto y recuperación
+            |
+            v
+Sin backend persistente / sin secretos / sin APIs externas
 ```
 
-The `scripts/build.mjs` process copies `public/` and `src/` into `dist/` as browser-compatible ECMAScript modules. No dependency download is required.
+`scripts/build.mjs` copia `public/` y `src/` dentro de `dist/`, utilizando módulos ECMAScript compatibles con navegador. No requiere instalar dependencias.
 
-## Impact semantics
+## Reglas de impacto
 
-A business service defines ordered **complete alternative dependency paths**. The first route represents the nominal primary path. Each path is available only if every component is healthy.
+Cada servicio de negocio define **rutas alternativas completas de dependencias**. La primera es la ruta principal. Cada ruta está disponible únicamente cuando todos sus componentes están disponibles.
 
-- **HEALTHY:** primary route and at least one alternative are available.
-- **EXPOSED:** primary route is available, but all alternatives are unavailable.
-- **SINGLE_PATH:** primary route is healthy and the service is defined without redundancy.
-- **FAILOVER:** primary route is disrupted, at least one complete alternative is healthy. Model service interruption during estimated failover.
-- **OUTAGE:** no complete route is healthy. Model estimated manual restoration.
+- **HEALTHY (operativo):** ruta principal y al menos una ruta alternativa disponibles.
+- **EXPOSED (redundancia reducida):** ruta principal disponible, alternativas indisponibles.
+- **SINGLE_PATH (ruta única):** ruta principal disponible sin redundancia definida.
+- **FAILOVER (contingencia):** ruta principal caída y al menos una alternativa operativa. Se supone una interrupción durante la conmutación.
+- **OUTAGE (indisponibilidad):** ninguna ruta disponible. Se estima un tiempo de recuperación manual.
 
-The model checks estimated recovery minutes against RTO and estimated data loss against RPO **only after simulated interruption**. It does not equate an alternate route with proven automatic failover.
+El modelo compara el tiempo estimado de recuperación con el RTO y la pérdida potencial de datos con el RPO **solo cuando ocurre una interrupción simulada**. Contar con una ruta alternativa no prueba que la conmutación haya sido ensayada.
 
-Risk index is an *illustrative weighted prioritization heuristic*, not a predictive probability or compliance score. Tier 1 services carry weight 3; Tier 2 carry weight 1. Each posture has an explicit risk factor (healthy 0; single path 0.25; exposed 0.35; failover 0.55; outage 1). A modeled RTO breach adds up to 0.12 before a per-service cap at 1. Score is normalized to 100 and rounded.
+### Índice de riesgo
 
-## Managerial intervention semantics
+Es un **indicador orientativo de priorización**, no una probabilidad de falla ni una certificación de cumplimiento.
 
-Interventions reduce modeled recovery time for a defined list of services. They never change network availability, topology, RPO, outage root causes or assumed architectural redundancy. Costs are fictional, and effects are assumptions rather than measured benefits.
+Los servicios de criticidad 1 pesan 3 y los de criticidad 2 pesan 1. Factores ficticios: operativo 0; ruta única 0,25; redundancia reducida 0,35; contingencia 0,55; indisponibilidad 1. Un incumplimiento de RTO suma 0,12, con tope individual en 1. El índice se normaliza de 0 a 100 y se redondea.
 
-CAPEX is treated as a modeled one-time investment *within the comparison*; the budgeting view shows a fictional annual baseline. Do not interpret the combined display as an accounting forecast.
+## Intervenciones de gestión
 
-## Security, privacy and reliability
+Las alternativas modifican tiempos **estimados** de recuperación para determinados servicios; nunca agregan rutas, modifican la topología, cambian el RPO ni resuelven por sí solas la causa del incidente. Sus costos son ficticios y sus beneficios requieren validación operativa.
 
-- No user authentication, uploads, backend writes or outbound network calls.
-- No API credentials or employer topology.
-- Scenario selection operates entirely in the browser.
-- Export is a local JSON download containing synthetic inputs and outcomes, not sensitive environment state.
-- Reproducibility checks: `npm run check`, `npm test`, `npm run build`.
-- Cloud hosting intended through Cloudflare Workers Static Assets. No production deployment is asserted.
+El CAPEX se representa como inversión puntual frente a un presupuesto base ilustrativo; la vista de OPEX representa gasto anual. No utilizar la combinación como un pronóstico contable.
 
-## Known limitations
+## Privacidad y calidad
 
-This is intentionally **not** a CMDB, an ITSM platform, a real-time observability system or a certified DR solution. It lacks discovery, live incident feeds, SLA measurement, failure probability estimation, procurement approvals, synchronization, audit identity, and evidence of real recovery exercises.
+- Sin autenticación de usuarios, cargas de archivos ni escrituras remotas.
+- Sin credenciales, topología de empleadores ni eventos reales.
+- Las selecciones se procesan localmente en el navegador.
+- El archivo exportado contiene exclusivamente datos y supuestos ficticios.
+- Pruebas reproducibles: `npm run check`, `npm test`, `npm run build`.
+- Alojamiento previsto: Cloudflare Workers Static Assets; **sin publicación confirmada aún**.
 
-Future work may introduce documented service ownership, dependency graph validation, scheduled tabletop exercise histories, independent failure classes, incident timelines, capacity planning and controlled decision approvals. Those features are proposals, not completed functionality.
+## Limitaciones y evolución
+
+ATLAS no es una CMDB, herramienta ITSM, plataforma de observabilidad ni solución DR certificada. No integra descubrimiento de activos, incidentes reales, medición de SLA, probabilidades de falla, permisos de aprobación ni ejercicios de recuperación demostrados.
+
+Como futuras mejoras se contemplan trazabilidad de responsables, validación de dependencias, historial de ejercicios de mesa, simulación de incidentes complejos, capacidad, bitácora de decisiones y flujos de aprobación. Son ideas para evolución, **no funcionalidades implementadas**.
