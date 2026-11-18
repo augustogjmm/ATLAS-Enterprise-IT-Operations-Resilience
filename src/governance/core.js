@@ -74,6 +74,46 @@ export function assertValidState(state) {
     }
   }
   if (state.verticals.length > 100 || state.events.length > 3000) throw new Error('El archivo supera el límite admitido.');
+  const ids=new Set(state.verticals.map(v=>v.id));
+  const isStr=x=>typeof x==='string'&&x.length<=1500;
+  const finite=x=>typeof x==='number'&&Number.isFinite(x);
+  const validDate=x=>typeof x==='string'&&/^\\d{4}-\\d{2}-\\d{2}$/.test(x);
+  for(const v of state.verticals){
+    if(!isStr(v.name)||!isStr(v.owner)||!isStr(v.description))throw new Error('Vertical con campos inválidos.');
+  }
+  for(const a of state.assessments){
+    if(!ids.has(a.verticalId)||!Number.isInteger(a.score)||a.score<1||a.score>5||!isStr(a.finding)||!isStr(a.owner)||!isStr(a.domain)||!isStr(a.evidence))
+      throw new Error('Assessment con datos inválidos.');
+  }
+  for(const c of state.capacities){
+    if(!ids.has(c.verticalId)||!isStr(c.name)||!isStr(c.unit)||!isStr(c.owner)||!finite(c.used)||!finite(c.total)||c.used<0||c.total<=0||!finite(c.growthPct)||c.growthPct<0||c.growthPct>100||!finite(c.thresholdPct)||c.thresholdPct<=0||c.thresholdPct>100)
+      throw new Error('Capacity con datos inválidos.');
+  }
+  for(const t of state.teamCapacities){
+    if(!ids.has(t.verticalId)||!isStr(t.name)||!isStr(t.owner)||!isStr(t.skillsGap)||!finite(t.availableFte)||t.availableFte<=0||!finite(t.allocatedFte)||t.allocatedFte<0||!finite(t.coveragePct)||t.coveragePct<0||t.coveragePct>100||!finite(t.thresholdPct)||t.thresholdPct<=0||t.thresholdPct>100)
+      throw new Error('Capacity de equipo con datos inválidos.');
+  }
+  for(const r of state.risks){
+    if(!ids.has(r.verticalId)||!isStr(r.title)||!isStr(r.description)||!isStr(r.owner)||!isStr(r.evidence)||!Number.isInteger(r.probability)||r.probability<1||r.probability>5||!Number.isInteger(r.impact)||r.impact<1||r.impact>5||!['abierto','validado','aceptado'].includes(r.status))
+      throw new Error('Riesgo con datos inválidos.');
+  }
+  const risks=new Set(state.risks.map(r=>r.id));
+  for(const a of state.actions){
+    if(!risks.has(a.riskId)||!isStr(a.title)||!isStr(a.owner)||!isStr(a.evidence)||!validDate(a.dueDate)||!['pendiente','en-curso','bloqueada','completada'].includes(a.status))
+      throw new Error('Acción con datos inválidos.');
+  }
+  for(const v of state.services){
+    if(!ids.has(v.verticalId)||!isStr(v.name)||!isStr(v.owner)||!isStr(v.drEvidence)||!finite(v.periodMinutes)||v.periodMinutes<=0||!finite(v.downtimeMinutes)||v.downtimeMinutes<0||v.downtimeMinutes>v.periodMinutes||!finite(v.targetPct)||v.targetPct<0||v.targetPct>100||!finite(v.rtoMin)||v.rtoMin<0||!finite(v.rpoMin)||v.rpoMin<0||!['sin-evaluar','aprobado','parcial','fallido'].includes(v.drResult))
+      throw new Error('Servicio con datos inválidos.');
+  }
+  for(const d of state.decisions){
+    if(d.riskId&&!risks.has(d.riskId))throw new Error('Decisión con riesgo inexistente.');
+    if(!isStr(d.title)||!isStr(d.owner)||!isStr(d.evidence)||!validDate(d.dueDate)||!['pendiente','resuelta'].includes(d.status))
+      throw new Error('Decisión con datos inválidos.');
+  }
+  for(const e of state.events){
+    if(!isStr(e.text)||!isStr(e.type)||!isStr(e.date))throw new Error('Registro de auditoría inválido.');
+  }
   return state;
 }
 
