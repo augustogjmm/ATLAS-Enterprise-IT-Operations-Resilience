@@ -8,7 +8,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -26,4 +26,18 @@ jobs:
           test -f dist/app.js
           test -f dist/lib/data.js
           test -f dist/lib/engine.js
-      # No credentials, package installs, external API calls or deployment side effects.
+      - name: Instalar navegador para pruebas funcionales
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Probar interfaz, escenarios y exportación en Chromium
+        run: node scripts/browser-smoke.mjs
+      - name: Guardar capturas de pantalla de revisión
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-capturas-escritorio-movil
+          path: test-artifacts/
+          if-no-files-found: ignore
+          retention-days: 7
+      # Sin credenciales, APIs productivas ni despliegue. Instalación de Playwright solo en CI.
