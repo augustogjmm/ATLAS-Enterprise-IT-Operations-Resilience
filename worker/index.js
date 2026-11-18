@@ -51,9 +51,23 @@ async function readBody(request) {
     throw new ApiError('Se requiere Content-Type application/json', 415);
   const hinted = Number(request.headers.get('content-length') || 0);
   if (hinted > 1024 * 1024) throw new ApiError('Máximo 1 MiB por operación', 413);
-  const raw = await request.text();
-  if (new TextEncoder().encode(raw).length > 1024 * 1024) throw new ApiError('Máximo 1 MiB por operación', 413);
-  try { return JSON.parse(raw); } catch { throw new ApiError('JSON inválido'); }
+  // Rechazar el exceso mientras se lee, incluso si Content-Length fue omitido o falsificado.
+  const reader=request.body?.getReader();
+  if (!reader) throw new ApiError('Cuerpo JSON obligatorio',400);
+  let bytes=0;const chunks=[];
+  try {
+    while (true) {
+      const {done,value}=await reader.read();
+      if (done) break;
+      bytes+=value.byteLength;
+      if (bytes>1024*1024) {await reader.cancel();throw new ApiError('Máximo 1 MiB por operación',413);}
+      chunks.push(value);
+    }
+  } finally {reader.releaseLock();}
+  const buffer=new Uint8Array(bytes);let offset=0;
+  for (const chunk of chunks) {buffer.set(chunk,offset);offset+=chunk.byteLength;}
+  try { return JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(buffer)); }
+  catch { throw new ApiError('JSON inválido'); }
 }
 async function memberFor(db, tenantId, identity) {
   if (!validId(tenantId)) throw new ApiError('Organización inválida', 404);
@@ -83,8 +97,15 @@ const publicWorkspace = row => ({id:row.id,name:row.name,revision:row.revision,
   state:JSON.parse(row.state_json),updatedAt:row.updated_at,updatedBy:row.updated_by});
 function originCheck(request) {
   if (!['POST','PUT','PATCH','DELETE'].includes(request.method)) return;
+  // El header custom evita envíos desde formularios cross-site y es exigido también a clientes API.
+  // No confiar exclusivamente en la cookie de Cloudflare Access como defensa CSRF.
   const origin = request.headers.get('Origin');
   if (origin && origin !== new URL(request.url).origin) throw new ApiError('Origen no permitido', 403);
+  if (request.headers.get('X-Atlas-CSRF') !== 'v5')
+    throw new ApiError('Falta control CSRF de ATLAS',403);
+  const site=request.headers.get('Sec-Fetch-Site');
+  if (site && !['same-origin','none'].includes(site))
+    throw new ApiError('Solicitud desde otro origen',403);
 }
 function extractPath(pathname) {
   const path = pathname.split('/').filter(Boolean);
