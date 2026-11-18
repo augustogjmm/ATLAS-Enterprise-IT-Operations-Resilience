@@ -10,7 +10,7 @@ export class RemoteWorkspaceError extends Error {
 const segment=value=>encodeURIComponent(String(value));
 
 export class RemoteWorkspaces {
-  constructor(fetcher=fetch, base='/api/v1') {
+  constructor(fetcher=(url,options)=>fetch(url,options), base='/api/v1') {
     this.fetcher=fetcher;
     this.base=base;
   }
