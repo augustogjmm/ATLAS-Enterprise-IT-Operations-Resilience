@@ -21,7 +21,7 @@ export class RemoteWorkspaces {
         method,
         cache:'no-store',
         credentials:'same-origin',
-        headers:{Accept:'application/json',...(body===undefined?{}:{'Content-Type':'application/json'})},
+        headers:{Accept:'application/json',...(body===undefined?{}:{'Content-Type':'application/json','X-Atlas-CSRF':'v5'})},
         ...(body===undefined?{}:{body:JSON.stringify(body)})
       });
     } catch {
