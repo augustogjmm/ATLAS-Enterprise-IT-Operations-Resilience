@@ -36,6 +36,13 @@ test('dual network failure disables both payment paths', () => {
   assert.ok(outcome.summary.tierOneAffected >= 1);
 });
 
+test('data loss scenario explicitly evaluates RPO on interrupted services', () => {
+  const outcome = evaluateScenario('data-loss');
+  assert.equal(outcome.services.find(x => x.id === 'payments').rpoBreach, true);
+  assert.equal(outcome.services.find(x => x.id === 'digital').rpoBreach, true);
+  assert.equal(outcome.services.find(x => x.id === 'identity').rpoBreach, false);
+});
+
 test('runbook intervention reduces modeled recovery without changing failed nodes', () => {
   const base = evaluateScenario('dc-north');
   const improved = evaluateScenario('dc-north', 'runbooks');
