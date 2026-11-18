@@ -12,7 +12,7 @@ export function performanceView(state,today,{esc,mini,semaphore,empty,nfmt,fmtPc
    <div class="performance-kpi-top"><span class="executive-overline">INDICADOR / ${esc(METRICS[k.metric].label)}</span>${badge(r.level,r.description)}</div>
    <h3>${esc(k.name)}</h3><div class="performance-actual">${esc(format(r.value,r.unit))}</div>
    <div class="performance-target">META <strong>${esc(format(k.target,r.unit))}</strong><span> ${r.direction==='lower'?'máximo':'mínimo'}</span></div>
-   <p>${esc(r.description)}</p><div class="performance-kpi-owner">RESPONSABLE · ${esc(k.owner)}</div>
+   <p>${esc(r.description)}</p><div class="performance-kpi-owner">RESPONSABLE · ${esc(k.owner)}</div><div class="performance-kpi-scope">ALCANCE · ${esc(state.verticals.find(v=>v.id===k.verticalId)?.name||"Corporativo")}</div>
    </article>`).join('');
   const objectiveMarkup=objectives.map(obj=>{
    const p=objectiveProgress(state,obj,today),results=(state.keyResults||[]).filter(kr=>kr.objectiveId===obj.id);
