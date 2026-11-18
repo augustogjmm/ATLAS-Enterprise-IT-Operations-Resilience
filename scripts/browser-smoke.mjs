@@ -39,16 +39,26 @@ try {
   await desktop.goto(url, { waitUntil: 'networkidle' });
   assert.match(await desktop.title(), /ATLAS/);
   assert.match(await desktop.locator('h1').innerText(), /decisiones/i);
+  assert.equal(await desktop.locator('link[href="./premium.css"]').count(), 1);
+  assert.equal(await desktop.locator('.hero-visual svg').count(), 1);
+  assert.match(await desktop.locator('#brief-headline').innerText(), /recuperación/i);
+  const premiumStyles = await desktop.locator('.hero').evaluate(el => ({
+    borderRadius: getComputedStyle(el).borderRadius,
+    backgroundColor: getComputedStyle(el).backgroundColor
+  }));
+  assert.ok(parseFloat(premiumStyles.borderRadius) >= 12, 'El hero debe tener el nuevo diseño premium');
   assert.equal(await desktop.locator('#metric-services').innerText(), '6');
   assert.equal(await desktop.locator('#scenario-select').inputValue(), 'dc-north');
   assert.ok(Number(await desktop.locator('#metric-affected').innerText()) > 0);
 
   await desktop.locator('#scenario-select').selectOption('dc-south');
   assert.equal(await desktop.locator('#metric-affected').innerText(), '0');
+  assert.match(await desktop.locator('#brief-headline').innerText(), /redundancia/i);
   assert.match(await desktop.locator('#posture-redundancy').innerText(), /ruta alternativa/i);
 
   await desktop.locator('#scenario-select').selectOption('dual-network');
   assert.ok(Number(await desktop.locator('#metric-affected').innerText()) >= 3);
+  assert.equal(await desktop.locator('#executive-brief').getAttribute('data-severity'), 'high');
 
   await desktop.locator('#scenario-select').selectOption('data-loss');
   assert.ok(Number(await desktop.locator('#metric-breaches').innerText()) > 0);
@@ -58,6 +68,8 @@ try {
   assert.match(await desktop.locator('#investment-name').innerText(), /contingencia/i);
   assert.match(await desktop.locator('#budget-change').innerText(), /CAPEX/);
   await desktop.screenshot({ path: resolve(artifacts, 'atlas-escritorio.png'), fullPage: true });
+  await desktop.locator('#scenario-select').selectOption('baseline');
+  await desktop.screenshot({ path: resolve(artifacts, 'atlas-escritorio-normal.png'), fullPage: true });
 
   const [download] = await Promise.all([
     desktop.waitForEvent('download'),
@@ -70,10 +82,20 @@ try {
   assert.equal(report.services.length, 6);
   assert.match(report.classification, /FICTICIA/);
 
+  const tablet = await browser.newPage({ viewport: { width: 820, height: 1180 }, deviceScaleFactor: 1 });
+  tablet.on('pageerror', error => errors.push('Tablet: ' + error.message));
+  await tablet.goto(url, { waitUntil: 'networkidle' });
+  assert.equal(await tablet.locator('#metric-services').innerText(), '6');
+  const tabletOverflow = await tablet.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  assert.ok(tabletOverflow <= 1, 'La interfaz no debe desbordar horizontalmente en tablet: ' + tabletOverflow);
+  await tablet.screenshot({ path: resolve(artifacts, 'atlas-tablet.png'), fullPage: true });
+  await tablet.close();
+
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
   mobile.on('pageerror', error => errors.push('Mobile: ' + error.message));
   await mobile.goto(url, { waitUntil: 'networkidle' });
   assert.equal(await mobile.locator('#metric-services').innerText(), '6');
+  assert.ok(await mobile.locator('.executive-brief').isVisible());
   await mobile.locator('#scenario-select').selectOption('cloud-outage');
   assert.ok(Number(await mobile.locator('#metric-affected').innerText()) >= 1);
   const overflow = await mobile.evaluate(() => ({
