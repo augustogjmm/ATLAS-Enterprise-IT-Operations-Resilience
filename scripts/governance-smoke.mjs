@@ -17,7 +17,7 @@ const server=createServer(async(req,res)=>{
   res.writeHead(200,{'content-type':contentTypes[extname(target)]||'application/octet-stream','cache-control':'no-store'});res.end(bytes);
  }catch(err){res.writeHead(404).end('Not Found');}
 });
-const browser=await chromium.launch({headless:true});
+const browser=await chromium.launch({headless:true, ...(process.env.CI?{channel:'chrome'}:{})});
 try{
  server.listen(0,'127.0.0.1');await once(server,'listening');
  await mkdir(artifacts,{recursive:true});
