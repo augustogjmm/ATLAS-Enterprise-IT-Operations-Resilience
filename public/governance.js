@@ -6,6 +6,8 @@ import {
 import {worstSignal, riskSignal, actionSignal, infrastructureSignal, workforceSignal, assessmentSignal, serviceSignal, verticalSignal, executiveSummary, riskMatrix} from './lib/governance/insights.js';
 import {METRICS,KPI_OPTIONS,ensurePerformanceState,seedDemoPerformance,validatePerformanceState,kpiResult,objectiveProgress,addKpi,addObjective,addKeyResult,closeObjective} from './lib/governance/performance.js';
 import {performanceView as renderPerformanceView} from './performance-ui.js';
+import {ensureIncidentState,seedDemoIncidents,validateIncidentState,parseIncidentCSV,importIncidents,resolveIncident,incidentMetrics,SAMPLE_CSV} from './lib/governance/incidents.js';
+import {incidentsView as renderIncidentsView} from './incidents-ui.js';
 
 const STORAGE_KEY='atlas-governance-workspace-v1';
 const today=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')};
@@ -29,6 +31,7 @@ const getService=id=>state.services.find(s=>s.id===id);
 const idFactory=prefix=>prefix+'-'+crypto.randomUUID();
 const viewMeta={
  performance:['KPI y OKR tecnológicos','Indicadores, objetivos, líneas base y resultados clave calculados'],
+ incidents:['Incidentes y MTTR','Ingestión CSV, incidentes críticos, resolución y tendencias mensuales'],
  overview:['Visión ejecutiva','Alertas accionables y seguimiento de prioridades'],
  verticals:['Verticales y equipos','Gobierno por dominio y responsables'],
  capacity:['Capacity management','Utilización, umbrales y proyección de tres meses'],
@@ -46,24 +49,29 @@ let storageOK=true;
 function upgrade(data){
  assertValidState(data);
  const missing=!Array.isArray(data.kpis)&&!Array.isArray(data.objectives)&&!Array.isArray(data.keyResults);
+ const noIncidents=!Array.isArray(data.incidents);
  ensurePerformanceState(data);
  if(missing&&data.kind==='demo')seedDemoPerformance(data);
+ ensureIncidentState(data);
+ if(noIncidents&&data.kind==='demo')seedDemoIncidents(data);
  validatePerformanceState(data);
+ validateIncidentState(data);
  return data;
 }
 function load(){
  try {
   const raw=localStorage.getItem(STORAGE_KEY);
-  const data=raw?upgrade(JSON.parse(raw)):seedDemoPerformance(createDemo());
-  if(!raw||!JSON.parse(raw).kpis)localStorage.setItem(STORAGE_KEY,JSON.stringify(data));
+  const data=raw?upgrade(JSON.parse(raw)):seedDemoIncidents(seedDemoPerformance(createDemo()));
+  if(!raw||!Array.isArray(JSON.parse(raw).kpis)||!Array.isArray(JSON.parse(raw).incidents))localStorage.setItem(STORAGE_KEY,JSON.stringify(data));
   return data;
- } catch(err){storageOK=false;return seedDemoPerformance(createDemo());}
+ } catch(err){storageOK=false;return seedDemoIncidents(seedDemoPerformance(createDemo()));}
 }
 let state=load();
 function save(message){
   state.kind=state.kind==='demo'?'custom':state.kind;
   assertValidState(state);
   validatePerformanceState(state);
+  validateIncidentState(state);
   try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));storageOK=true;}
   catch(err){storageOK=false;notice('No se pudo guardar. Exportá un respaldo; el navegador bloqueó el almacenamiento.',true)}
   render();
@@ -326,7 +334,7 @@ function render(){
  $('view-title').textContent=meta[0];$('view-subtitle').textContent=meta[1];
  $('breadcrumb-current').textContent=meta[0].toUpperCase();
  $('environment-label').textContent=state.kind==='demo'?'DATOS FICTICIOS DE DEMOSTRACIÓN':state.kind==='local'?'ESPACIO LOCAL SIN DATOS DE DEMOSTRACIÓN':'DATOS LOCALES EDITADOS · PUEDE CONTENER EJEMPLOS FICTICIOS';
- const pages={overview,performance:()=>renderPerformanceView(state,today(),{esc,mini,semaphore,empty,nfmt,fmtPct}),verticals:verticalsView,capacity:capacityView,assessments:assessmentsView,risks:risksView,actions:actionsView,continuity:continuityView,committee:committeeView};
+ const pages={overview,performance:()=>renderPerformanceView(state,today(),{esc,mini,semaphore,empty,nfmt,fmtPct}),incidents:()=>renderIncidentsView(state,today(),{esc,mini,semaphore,empty,nfmt,fmtPct}),verticals:verticalsView,capacity:capacityView,assessments:assessmentsView,risks:risksView,actions:actionsView,continuity:continuityView,committee:committeeView};
  $('view-root').innerHTML=(pages[view]||overview)();
  for(const node of document.querySelectorAll('[data-view]'))node.classList.toggle('selected',node.dataset.view===view);
 }
@@ -426,10 +434,10 @@ document.addEventListener('click',e=>{
   setTimeout(()=>URL.revokeObjectURL(objectUrl),1500);notice('Respaldo JSON descargado.');
  }
  if(cmd.dataset.command==='demo'&&confirm('¿Reemplazar los datos locales actuales por la demostración ficticia? Exportá un respaldo si querés conservarlos.')){
-  state=seedDemoPerformance(createDemo());save('Demostración restaurada.');state.kind='demo';localStorage.setItem(STORAGE_KEY,JSON.stringify(state));render();
+  state=seedDemoIncidents(seedDemoPerformance(createDemo()));save('Demostración restaurada.');state.kind='demo';localStorage.setItem(STORAGE_KEY,JSON.stringify(state));render();
  }
  if(cmd.dataset.command==='empty'&&confirm('¿Vaciar todos los registros locales? Esta acción no se puede deshacer sin un respaldo exportado.')){
-  state=ensurePerformanceState(makeEmpty());save('Espacio local vacío preparado.');switchView('verticals');
+  state=ensureIncidentState(ensurePerformanceState(makeEmpty()));save('Espacio local vacío preparado.');switchView('verticals');
  }
 });
 $('record-form').addEventListener('submit',e=>{
@@ -451,7 +459,7 @@ $('import-file').addEventListener('change',async e=>{
 });
 window.addEventListener('storage',e=>{
  if(e.key!==STORAGE_KEY)return;
- try{state=e.newValue?upgrade(JSON.parse(e.newValue)):seedDemoPerformance(createDemo());render();notice('Los registros fueron actualizados desde otra pestaña.')}catch{notice('No se pudo sincronizar esta pestaña.',true)}
+ try{state=e.newValue?upgrade(JSON.parse(e.newValue)):seedDemoIncidents(seedDemoPerformance(createDemo()));render();notice('Los registros fueron actualizados desde otra pestaña.')}catch{notice('No se pudo sincronizar esta pestaña.',true)}
 });
 render();
 if(!storageOK)notice('El almacenamiento local no está disponible: los cambios no persistirán.',true);
