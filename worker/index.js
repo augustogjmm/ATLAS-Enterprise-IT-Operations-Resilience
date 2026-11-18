@@ -145,15 +145,17 @@ export function createHandler({verify = verifyAccessToken} = {}) {
         await getWorkspace(db,tenantId,path[5]);
         const state=normalizeState(data.state);
         const now=new Date().toISOString(),newRevision=expected+1;
+        // D1.batch ejecuta las instrucciones en una única transacción.
+        // Verificar la revisión ANTES de actualizar evita auditar escrituras rechazadas.
         const outcome=await db.batch([
-          db.prepare('UPDATE atlas_workspaces SET state_json=?,revision=revision+1,updated_by=?,updated_at=? WHERE id=? AND tenant_id=? AND revision=?')
-            .bind(JSON.stringify(state),identity.email,now,path[5],tenantId,expected),
           db.prepare('INSERT INTO atlas_audit_events(id,tenant_id,workspace_id,actor_email,action,previous_revision,new_revision,metadata_json,occurred_at) SELECT ?,?,?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM atlas_workspaces WHERE id=? AND tenant_id=? AND revision=?)')
             .bind(crypto.randomUUID(),tenantId,path[5],identity.email,'workspace.updated',expected,newRevision,
               JSON.stringify({kind:state.kind,risks:state.risks.length,actions:state.actions.length,incidents:state.incidents.length}),
-              now,path[5],tenantId,newRevision)
+              now,path[5],tenantId,expected),
+          db.prepare('UPDATE atlas_workspaces SET state_json=?,revision=revision+1,updated_by=?,updated_at=? WHERE id=? AND tenant_id=? AND revision=?')
+            .bind(JSON.stringify(state),identity.email,now,path[5],tenantId,expected)
         ]);
-        if (outcome[0]?.meta?.changes !== 1)
+        if (outcome[1]?.meta?.changes !== 1)
           throw new ApiError('Conflicto de edición: recargá el workspace antes de guardar',409);
         return reply({id:path[5],revision:newRevision,updatedAt:now});
       }
