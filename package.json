@@ -6,7 +6,7 @@
   "description": "Synthetic executive IT architecture, operations and resilience simulator.",
   "scripts": {
     "test": "node --test",
-    "check": "node --check src/data.js && node --check src/engine.js && node --check src/governance/core.js && node --check src/governance/insights.js && node --check src/governance/performance.js && node --check src/governance/incidents.js && node --check src/governance/import-mapping.js && node --check public/import-wizard-ui.js && node --check public/incidents-ui.js && node --check public/performance-ui.js && node --check public/app.js && node --check public/governance.js && node --check scripts/build.mjs",
+    "check": "node --check src/data.js && node --check src/engine.js && node --check src/governance/core.js && node --check src/governance/insights.js && node --check src/governance/performance.js && node --check src/governance/incidents.js && node --check src/governance/import-mapping.js && node --check public/import-wizard-ui.js && node --check public/incidents-ui.js && node --check public/performance-ui.js && node --check public/app.js && node --check public/governance.js && node --check public/remote-workspaces.js && node --check public/v5-ui.js && node --check worker/auth.js && node --check worker/index.js && node --check scripts/v5-browser-smoke.mjs && node --check scripts/build.mjs",
     "build": "node scripts/build.mjs"
   },
   "engines": {
