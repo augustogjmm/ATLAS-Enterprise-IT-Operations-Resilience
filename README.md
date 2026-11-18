@@ -1,15 +1,16 @@
 # ATLAS — IT Governance & Operations Management
 
-### Gobierno de Tecnología: KPI, OKR, capacity, assessments, riesgos, acciones y continuidad
+### Gobierno de Tecnología: KPI, OKR, incidentes ITSM, capacity, riesgos y continuidad
 
 **ATLAS** es un proyecto personal demostrativo para roles de Head of IT, Gerencia de Infraestructura, Operaciones Tecnológicas y Arquitectura Empresarial. El propósito es mostrar cómo se organiza el **gobierno de tecnología basado en registros, responsables, prioridades y evidencias**, no solamente indicadores visuales.
 
-> **Versión funcional V2:** plataforma estática, con operaciones reales sobre datos almacenados en **el navegador del usuario**. El contenido de inicio es 100% ficticio, identificado como demostración. No monitorea infraestructura ni conecta servicios productivos. No utiliza todavía D1 ni autenticación multiusuario.
+> **Versión funcional V3:** plataforma estática, con operaciones reales sobre datos almacenados en **el navegador del usuario**. El contenido de inicio es 100% ficticio, identificado como demostración. No monitorea infraestructura ni conecta servicios productivos. No utiliza todavía D1 ni autenticación multiusuario.
 
 ## ¿Qué podés hacer?
 
 | Área | Operaciones disponibles |
 |---|---|
+| **Incidentes ITSM** | Importar CSV con validación, deduplicación y cierres; calcular MTTR, P1/P2, pendientes, históricos mensuales y métricas por servicio, procesados localmente. |
 | **KPI / OKR** | Definir indicadores y objetivos con responsables y metas, vincular KR con KPI, calcular avances desde registros, registrar cierre con evidencia y congelar valores al cerrar. |\n| **Verticales y equipos** | Registrar unidades de gestión con responsables y ámbitos, comparar madurez y exposición. |
 | **Capacity tecnológico** | Registrar consumo/total por recurso, umbrales y tasa de crecimiento; calcular utilización y proyección a tres meses. Una medición sobre el umbral genera un riesgo vinculado. |
 | **Capacity de equipos** | Registrar FTE disponibles/asignados, cobertura operativa, brechas de reemplazo o habilidades. Sobrecarga o cobertura baja dispara un riesgo. No se evalúa desempeño individual. |
@@ -31,6 +32,14 @@
 6. **Indicadores:** la situación ejecutiva se actualiza a partir de los registros y sus relaciones.
 
 La segunda automatización vincula **mediciones de capacity sobre el umbral** con riesgos. Los KPI y KR se recalculan cuando los registros cambian: un riesgo que recibe un plan modifica la cobertura, los riesgos sin plan y los OKR que dependan de esas métricas. La puntuación de exposición resulta de **probabilidad × impacto**, no de un modelo probabilístico.
+
+## ITSM: incidentes y métricas derivadas
+
+ATLAS importa incidentes desde CSV con identificador, servicio, prioridad P1–P4, apertura, resolución ISO 8601 con zona horaria y descripción. Se valida todo el lote antes de aplicar cambios y se reconocen IDs repetidos sin duplicar registros.
+
+El módulo calcula MTTR de 90 días, P1/P2 de 30 días, incidentes abiertos, estadísticas por servicio y tendencias mensuales. Se incorporan tres nuevos KPI vinculables a OKR: MTTR (min), P1/P2 y pendientes. **Total: 13 métricas calculables.**
+
+Importante: MTTR de tickets no es indisponibilidad real. El CSV no modifica automáticamente los minutos de caída ni los indicadores SLA de servicios.
 
 ## Ejecución local
 
@@ -54,7 +63,9 @@ Navegador / ATLAS Governance
   ├── public/index.html          -> experiencia de gobierno
   ├── public/governance.css      -> presentación responsive
   ├── public/governance.js       -> formularios, gestión, respaldos
-  ├── src/governance/core.js     -> motor de dominio determinista\n  ├── src/governance/insights.js -> semáforos ejecutivos, matriz de riesgos y status por vertical\n  ├── src/governance/performance.js -> métricas KPI y progreso de OKR verificables\n  ├── public/performance-ui.js  -> tablero de indicadores y objetivos
+  ├── src/governance/core.js     -> motor de dominio determinista\n  ├── src/governance/insights.js -> semáforos ejecutivos, matriz de riesgos y status por vertical\n  ├── src/governance/performance.js -> métricas KPI y progreso de OKR verificables
+  ├── src/governance/incidents.js -> importación CSV, incidentes, MTTR y tendencias
+  ├── public/incidents-ui.js -> panel de incidentes y CSV\n  ├── public/performance-ui.js  -> tablero de indicadores y objetivos
   └── localStorage              -> persistencia por navegador
 
 Simulador conceptual anterior
@@ -81,11 +92,12 @@ Los KPI disponibles son un **catálogo acotado de mediciones calculables**, no u
 
 **No cargar información empresarial confidencial ni datos personales.** Este entorno público está concebido como demostración. Los datos iniciales son ficticios; si el usuario introduce información propia, la aplicación no puede verificarla automáticamente.
 
-La siguiente evolución prevista es D1 + autenticación + control por roles, previo diseño de seguridad y validación de cuotas del plan gratuito. Quedan pendientes importación de incidentes CSV, conectores de fuentes reales, KPI por vertical y series históricas. No se declaran implementados.
+La siguiente evolución prevista es D1 + autenticación + control por roles, previo diseño de seguridad y validación de cuotas del plan gratuito. Quedan pendientes conectores ITSM productivos, mapeo de formatos de terceros, KPI por vertical y auditoría de origen. No se declaran implementados.
 
 ## Documentación
 
 - [Modelo y criterios del primer circuito funcional](docs/GOBIERNO_FUNCIONAL_V1.md)\n- [Definiciones y metodología KPI/OKR](docs/KPI_OKR_METODOLOGIA.md)
+- [Importación ITSM, CSV y metodología MTTR](docs/INCIDENTES_MTTR_CSV.md)
 - [Simulador de resiliencia y su arquitectura](docs/ARCHITECTURE.md)
 - [Guía de Cloudflare](docs/DESPLIEGUE_CLOUDFLARE.md)
 - [Seguridad](SECURITY.md)
