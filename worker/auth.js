@@ -65,7 +65,7 @@ export async function verifyAccessToken(request, env, fetcher = fetch) {
       (typeof payload.nbf === 'number' && payload.nbf > now) ||
       (typeof payload.iat === 'number' && payload.iat > now + 60) ||
       typeof payload.sub !== 'string' || !payload.sub ||
-      typeof payload.email !== 'string' || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(payload.email))
+      typeof payload.email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email))
     throw new AccessError();
   return { sub: payload.sub, email: payload.email.trim().toLowerCase(), name: String(payload.name || '').slice(0, 100) };
 }
