@@ -12,12 +12,12 @@ const uid=p=>p+'-t-'+(++serial);
 test('catálogo de KPI ofrece fórmulas y unidades concretas',()=>{
  assert.equal(METRICS.critical_unmanaged.direction,'lower');
  assert.equal(METRICS.dr_verified.unit,'%');
- assert.equal(Object.keys(METRICS).length,10);
+ assert.equal(Object.keys(METRICS).length,13);
 });
 
 test('nuevos KPI se calculan a partir de los datos del modelo',()=>{
  const s=seedDemoPerformance(createDemo());
- assert.equal(s.kpis.length,5);
+ assert.equal(s.kpis.length,7);
  assert.equal(s.objectives.length,2);
  assert.equal(metricValue(s,'critical_unmanaged',day),1);
  assert.equal(metricValue(s,'overdue_actions',day),1);
@@ -87,6 +87,6 @@ test('mantiene compatibilidad con respaldos anteriores que no tienen KPI/OKR',()
  assert.deepEqual(migrated.keyResults,[]);
  validatePerformanceState(migrated);
  const demo=seedDemoPerformance(migrated);
- assert.equal(demo.kpis.length,5);
- assert.equal(seedDemoPerformance(demo).kpis.length,5);
+ assert.equal(demo.kpis.length,7);
+ assert.equal(seedDemoPerformance(demo).kpis.length,7);
 });
