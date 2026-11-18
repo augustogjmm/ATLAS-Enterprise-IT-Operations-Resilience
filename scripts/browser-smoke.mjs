@@ -70,6 +70,7 @@ try {
   await desktop.screenshot({ path: resolve(artifacts, 'atlas-escritorio.png'), fullPage: true });
   await desktop.locator('#scenario-select').selectOption('baseline');
   await desktop.screenshot({ path: resolve(artifacts, 'atlas-escritorio-normal.png'), fullPage: true });
+  await desktop.locator('#scenario-select').selectOption('dc-north');
 
   const [download] = await Promise.all([
     desktop.waitForEvent('download'),
