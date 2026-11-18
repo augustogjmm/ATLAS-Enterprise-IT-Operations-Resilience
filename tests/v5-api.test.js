@@ -44,7 +44,7 @@ function fixture() {
     return {email,sub:'access-'+email,name:'Cuenta de prueba'};
   }});
   async function call(email, method, path, body, extra={}) {
-    const headers={'X-Test-Email':email,'Content-Type':'application/json',...extra};
+    const headers={'X-Test-Email':email,'Content-Type':'application/json','X-Atlas-CSRF':'v5',...extra};
     const req=new Request('https://atlas.example'+path,{
       method,headers,...(body===undefined?{}:{body:JSON.stringify(body)})
     });
@@ -124,6 +124,8 @@ test('validación y fail-closed: JSON, respaldo, origen y binding',async()=>{
   const path='/api/v1/tenants/org-a/workspaces';
   assert.equal((await call('owner@a.test','POST',path,{name:'X',state:{version:99}})).status,400);
   assert.equal((await call('owner@a.test','POST',path,{name:'X'},{Origin:'https://malicioso.test'})).status,403);
+  assert.equal((await call('owner@a.test','POST',path,{name:'X'},{'X-Atlas-CSRF':''})).status,403);
+  assert.equal((await call('owner@a.test','POST',path,{name:'X'},{'Sec-Fetch-Site':'cross-site'})).status,403);
   const unconfigured=await createHandler({verify:async()=>({email:'owner@a.test',sub:'x'})})(
     new Request('https://atlas.example/api/v1/session'),{});
   assert.equal(unconfigured.status,503);
