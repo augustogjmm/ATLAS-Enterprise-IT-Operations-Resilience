@@ -87,13 +87,22 @@ async function memberFor(db, tenantId, identity) {
   if (!member) throw new ApiError('Organización no autorizada', 403);
   if (member.access_sub && member.access_sub !== identity.sub) throw new ApiError('Identidad no coincide con la registrada', 403);
   if (!member.access_sub) {
-    await db.prepare("UPDATE atlas_memberships SET access_sub=?,updated_at=? WHERE tenant_id=? AND email=? AND access_sub IS NULL")
-      .bind(identity.sub, new Date().toISOString(), tenantId, identity.email).run();
-    const pinned = await db.prepare('SELECT access_sub FROM atlas_memberships WHERE tenant_id=? AND email=?')
-      .bind(tenantId, identity.email).first();
-    if (pinned?.access_sub !== identity.sub) throw new ApiError('Identidad registrada para otro inicio de sesión', 403);
+    await db.prepare(
+      "UPDATE atlas_memberships SET access_sub=?,updated_at=? "+
+      "WHERE tenant_id=? AND email=? AND access_sub IS NULL AND status='active' "+
+      "AND EXISTS(SELECT 1 FROM atlas_tenants WHERE id=? AND status='active')"
+    ).bind(identity.sub, new Date().toISOString(), tenantId, identity.email, tenantId).run();
   }
-  return member;
+  // Releer membresía y rol DESPUÉS de fijar el sujeto. Una revocación o
+  // degradación entre la primera consulta y el bind no debe autorizar la ruta.
+  const current=await db.prepare(
+    "SELECT m.tenant_id,m.email,m.access_sub,m.role FROM atlas_memberships m "+
+    "JOIN atlas_tenants t ON t.id=m.tenant_id "+
+    "WHERE m.tenant_id=? AND m.email=? AND m.status='active' AND t.status='active'"
+  ).bind(tenantId, identity.email).first();
+  if(!current || current.access_sub!==identity.sub)
+    throw new ApiError('Acceso revocado o identidad registrada para otra sesión',403);
+  return current;
 }
 async function getWorkspace(db, tenantId, id) {
   if (!validId(id)) throw new ApiError('Workspace inválido', 404);

@@ -20,12 +20,21 @@ function fixture() {
   ]) sqlite.prepare("INSERT INTO atlas_memberships(tenant_id,email,role,status,created_at,updated_at) VALUES(?,?,?,'active',?,?)")
     .run(org,email,role,stamp,stamp);
   let beforeNextBatch=null;
+  let afterMembershipLookup=null;
   const binding = {
     prepare(sql) {
       let args=[];
       return {
         bind(...params) {args=params;return this;},
-        async first() {return sqlite.prepare(sql).get(...args) || null;},
+        async first() {
+          const result=sqlite.prepare(sql).get(...args)||null;
+          if(afterMembershipLookup &&
+            sql.includes('SELECT m.tenant_id, m.email, m.access_sub, m.role FROM atlas_memberships')){
+            const hook=afterMembershipLookup;afterMembershipLookup=null;
+            hook(sqlite);
+          }
+          return result;
+        },
         async all() {return {results:sqlite.prepare(sql).all(...args)};},
         async run() {return {meta:sqlite.prepare(sql).run(...args)};}
       };
@@ -57,7 +66,8 @@ function fixture() {
     const response=await handler(req,env);
     return {status:response.status,body:await response.json()};
   }
-  return {sqlite,env,call,beforeBatch:hook=>{beforeNextBatch=hook;}};
+  return {sqlite,env,call,beforeBatch:hook=>{beforeNextBatch=hook;},
+    afterMembershipLookup:hook=>{afterMembershipLookup=hook;}};
 }
 
 test('multi-tenant: sesión sin permisos sobre otra organización',async()=>{
@@ -447,4 +457,46 @@ test('restauración: historial depurado entre prechequeo y transacción no corro
     'SELECT revision FROM atlas_workspace_revisions WHERE workspace_id=?'
   ).all(created.body.id);
   assert.deepEqual(history.map(x=>x.revision),[2]);
+});
+
+test('identidad: revocación tras SELECT inicial no fija access_sub ni permite lectura',async()=>{
+  const {call,sqlite,afterMembershipLookup}=fixture();
+  afterMembershipLookup(db=>db.prepare(
+    "UPDATE atlas_memberships SET status='revoked' WHERE tenant_id=? AND email=?"
+  ).run('org-a','viewer@a.test'));
+  const response=await call('viewer@a.test','GET','/api/v1/tenants/org-a/workspaces');
+  assert.equal(response.status,403);
+  const member=sqlite.prepare(
+    'SELECT status,access_sub FROM atlas_memberships WHERE tenant_id=? AND email=?'
+  ).get('org-a','viewer@a.test');
+  assert.equal(member.status,'revoked');
+  assert.equal(member.access_sub,null,'No fijar el sujeto tras revocación');
+  assert.equal(sqlite.prepare('SELECT count(*) AS n FROM atlas_audit_events').get().n,0);
+});
+
+test('identidad: organización inactivada durante el bind impide acceso y cambio de sujeto',async()=>{
+  const {call,sqlite,afterMembershipLookup}=fixture();
+  afterMembershipLookup(db=>db.prepare(
+    "UPDATE atlas_tenants SET status='inactive' WHERE id=?"
+  ).run('org-a'));
+  const response=await call('viewer@a.test','GET','/api/v1/tenants/org-a/workspaces');
+  assert.equal(response.status,403);
+  assert.equal(sqlite.prepare(
+    'SELECT access_sub FROM atlas_memberships WHERE tenant_id=? AND email=?'
+  ).get('org-a','viewer@a.test').access_sub,null);
+});
+
+test('identidad: cambio de admin a viewer entre consultas usa rol vigente',async()=>{
+  const {call,sqlite,afterMembershipLookup}=fixture();
+  afterMembershipLookup(db=>db.prepare(
+    "UPDATE atlas_memberships SET role='viewer' WHERE tenant_id=? AND email=?"
+  ).run('org-a','admin@a.test'));
+  const denied=await call('admin@a.test','GET','/api/v1/tenants/org-a/audit');
+  assert.equal(denied.status,403);
+  const allowed=await call('admin@a.test','GET','/api/v1/tenants/org-a/workspaces');
+  assert.equal(allowed.status,200);
+  assert.equal(allowed.body.role,'viewer');
+  assert.equal(sqlite.prepare(
+    'SELECT access_sub FROM atlas_memberships WHERE tenant_id=? AND email=?'
+  ).get('org-a','admin@a.test').access_sub,'access-admin@a.test');
 });
