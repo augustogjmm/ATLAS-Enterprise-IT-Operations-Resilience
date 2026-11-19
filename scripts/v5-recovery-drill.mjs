@@ -51,7 +51,8 @@ const root='/api/v1/tenants/org-recovery/workspaces';
 function integrity(db){
  assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(),[]);
  const verdict=db.prepare('PRAGMA integrity_check').all();
- assert.deepEqual(verdict,[{'integrity_check':'ok'}]);
+ assert.equal(verdict.length,1);
+ assert.equal(verdict[0].integrity_check,'ok');
  const tables=db.prepare("SELECT name FROM sqlite_master WHERE name LIKE 'atlas_%' AND type='table'").all();
  assert.equal(tables.length,5,'Las cinco tablas de ATLAS V5 deben existir');
 }
