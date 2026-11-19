@@ -2,7 +2,7 @@
 // Las identidades se inyectan SOLO desde Playwright; producción verifica JWT de Access.
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
-import {readFile,readFileSync} from 'node:fs/promises';
+import {readFile} from 'node:fs/promises';
 import {resolve,relative,extname} from 'node:path';
 import {once} from 'node:events';
 import {DatabaseSync} from 'node:sqlite';
