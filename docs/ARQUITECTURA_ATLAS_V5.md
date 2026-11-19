@@ -54,6 +54,8 @@ Migración `migrations/0001_atlas_v5.sql` (sin `PRAGMA foreign_keys=ON` porque D
 
 Se preservan las estructuras y cálculos de V4; no se cambia `SCHEMA_VERSION=1` del dominio mientras los registros sean compatibles. La importación de JSON histórico exige aprobación del usuario y no reemplaza automáticamente los datos remotos.
 
+**Permisos frente a carreras:** creación, modificación y restauración consultan la membresía al comienzo de cada solicitud y la revalidan nuevamente dentro de las sentencias transaccionales de D1. Si un administrador revoca o degrada el rol antes de confirmar, la operación termina en HTTP 403 sin registrar escritura, revisión ni evento de auditoría. La CI reproduce esa intercalación de manera determinista con SQLite nativo.
+
 La edición exige `revision`. Dos editores que intenten modificar la misma revisión no pueden pisarse silenciosamente: la segunda escritura recibe **HTTP 409**. Se agregó historial acotado a las **últimas cinco versiones de cada workspace** (`migrations/0002_atlas_v5_history.sql`): las versiones antiguas se depuran al guardar, para limitar almacenamiento en D1. Los roles `owner` y `admin` pueden restaurar una versión previa, creando una revisión nueva y un evento `workspace.restored` con referencia a la revisión fuente. `auditor` puede consultar metadatos históricos sin restaurar; `editor` y `viewer` no consultan versiones previas. Actualización y evento de auditoría se ejecutan en un lote D1 transaccional; el cambio se registra con identidad, fecha y revisión. En esta fase, el snapshot tiene un límite de 1 MiB y la bitácora lista hasta 100 eventos recientes.
 
 **Importante:** la auditoría está separada de `state.events` editable por usuarios, pero no es inmutable frente a un administrador de la propia base de datos. Una auditoría de cumplimiento formal precisará retención controlada, integridad/almacenamiento externo y procedimiento de revisión.
@@ -123,6 +125,8 @@ Referencias oficiales:
 - En un workspace remoto de lectura, los formularios se bloquean visualmente, además de estar prohibidos por el servidor. El rol se consulta desde la API y nunca se considera suficiente para autorizar operaciones de backend.
 - Las modificaciones remotas se serializan: mientras se guarda una revisión, se bloquean nuevas escrituras. La operación solo se confirma visualmente tras recibir respuesta del servidor.
 - Ante HTTP 409 o fallo que impida confirmar la escritura, se suspenden más cambios remotos, se conservan los datos editados en memoria y se ofrece exportación JSON. Recargar o volver al modo local requiere confirmación.
+- Ante pérdida de respuesta del servidor, **Verificar guardado en servidor** consulta la revisión remota mediante GET autenticado y compara el snapshot con el intento pendiente. Si coinciden, confirma esa revisión sin generar otro PUT; si difieren, mantiene los datos del navegador y pide exportar/reconciliar. No hay reintento automático de escrituras inciertas.
+- La pestaña presenta aviso al cerrar o recargar si hay una operación remota pendiente o un guardado sin confirmar. **Los cambios no confirmados permanecen solo en memoria**; ATLAS no los copia silenciosamente al `localStorage` de V4.
 - «Volver a V4 local» recupera el snapshot local preexistente, sin escribir en D1 ni borrar archivos `localStorage`.
 - «Crear workspace» admite comenzar vacío. La copia de registros locales requiere dos confirmaciones explícitas para evitar transmisión accidental de datos.
 
