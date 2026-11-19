@@ -108,7 +108,7 @@ try{
     await s.page.getByText('Compartido: ATLAS compartido').waitFor();
   }
   async function addVertical(s,name){
-    await s.page.locator('[data-view="verticals"]').click();
+    await s.page.locator('.sidebar [data-view="verticals"]').click();
     await s.page.locator('[data-open="vertical"]').first().click();
     await s.page.locator('#field-name').fill(name);
     await s.page.locator('#field-owner').fill('Operaciones IT');
@@ -120,7 +120,7 @@ try{
   const localOwner=await owner.page.evaluate(()=>localStorage.getItem('atlas-governance-workspace-v1'));
   await Promise.all([open(owner),open(editor),open(viewer)]);
   assert.equal((await direct('viewer@a.test','GET',basePath)).status,200);
-  await viewer.page.locator('[data-view="verticals"]').click();
+  await viewer.page.locator('.sidebar [data-view="verticals"]').click();
   assert.equal(await viewer.page.locator('[data-open="vertical"]').first().isDisabled(),true);
   const illicit=await viewer.page.evaluate(async(path)=>{
     const res=await fetch(path,{method:'PUT',credentials:'same-origin',
