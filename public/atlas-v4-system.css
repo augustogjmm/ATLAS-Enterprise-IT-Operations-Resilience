@@ -114,3 +114,21 @@ button:focus-visible,a:focus-visible,input:focus-visible,[tabindex]:focus-visibl
 .command-decision-detail p{font-size:11px;line-height:1.4;margin:8px 0;color:#bad0c7}
 .command-detail-link{display:inline-flex;background:transparent;color:#5dd1ae;border:0;padding:9px 10px 9px 0;font-size:11px!important}
 @media(max-width:720px){.command-connections{display:none}}
+
+.command-header-divider{color:#cad7ce;margin:0 10px}
+#atlas-organization{font-size:12px;letter-spacing:0;text-transform:none;color:#4e6861;font-weight:600}
+.topbar .top-actions{gap:12px;display:flex;align-items:center}
+.atlas-top-icon{width:34px;height:34px;border:0;border-radius:9px;background:transparent;color:#3e5f58;font-size:23px;display:grid;place-items:center}
+.atlas-top-icon:hover{background:#e4ede5}
+.atlas-top-avatar{width:35px;height:35px;border-radius:50%;background:var(--atlas-forest);color:white;border:1px solid #6b9b8d;font-size:11px;font-weight:800}
+.atlas-modal{width:min(550px,calc(100vw - 24px));border:1px solid #d7e0d9;border-radius:12px;padding:18px;background:var(--atlas-surface);color:var(--atlas-ink);box-shadow:0 24px 70px #092b2a55}
+.atlas-modal::backdrop{background:#0b20258f}
+.atlas-modal-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:15px;color:#234441;font-size:13px;font-weight:800}
+.atlas-modal-head button{border:0;background:#f1f5f1;border-radius:6px;width:32px;height:32px;color:#344f48;font-size:20px}
+.atlas-modal input{display:block;width:100%;background:#f9faf7;border:1px solid #cddbd2;color:#18372f;border-radius:8px;padding:12px;font-size:13px}
+.atlas-modal-results{margin-top:12px;max-height:360px;overflow:auto}
+.atlas-hit{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;text-align:left;background:white;border:0;border-bottom:1px solid #e5ebe6;color:#234b43;font-size:12px}
+.atlas-hit:hover{background:#f0f7f2}
+.atlas-hit small{font-size:10px;color:#729082}
+.atlas-modal-disclaimer{color:#758b81;font-size:11px}
+@media(max-width:720px){.topbar .breadcrumb{max-width:45%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.topbar .breadcrumb span.command-header-divider,.topbar #atlas-organization{display:none}.topbar .top-actions{gap:2px}.topbar .top-status{font-size:0}.topbar .top-status .indicator{font-size:10px}.atlas-top-icon{width:27px;height:30px}.atlas-top-avatar{height:29px;width:29px;font-size:9px}}
