@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
-import {readFile} from 'node:fs/promises';
+import {readFile,mkdir} from 'node:fs/promises';
 import {resolve,relative,extname} from 'node:path';
 import {once} from 'node:events';
 import {chromium} from 'playwright';
@@ -163,6 +163,29 @@ try{
   await owner.page.locator('[data-workspace-command="open"]').waitFor();
   await owner.page.locator('[data-workspace-command="open"]').click();
   await owner.page.getByText('Compartido: Gobierno Compartido').waitFor();
+  // Contrato visual V4: capturas de la aplicación real V5, no un mockup ni HTML alternativo.
+  await owner.page.setViewportSize({width:1700,height:1260});
+  await owner.page.locator('.command-hero h1').getByText('Visibilidad para decidir.').waitFor();
+  assert.equal(await owner.page.locator('.command-domain').count(),8);
+  assert.equal(await owner.page.locator('.command-lenses button').count(),5);
+  await mkdir('test-artifacts',{recursive:true});
+  await owner.page.screenshot({path:'test-artifacts/v5-command-1700.png',fullPage:true});
+  await owner.page.setViewportSize({width:430,height:1600});
+  await owner.page.screenshot({path:'test-artifacts/v5-command-430.png',fullPage:true});
+  const mobileOverflow=await owner.page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1);
+  assert.equal(mobileOverflow,false,'El command V5 no admite desbordamiento horizontal a 430 px');
+  await owner.page.locator('[data-command-lens="Capacidad"]').click();
+  assert.equal(await owner.page.locator('[data-command-lens="Capacidad"]').getAttribute('aria-pressed'),'true');
+  await owner.page.locator('[data-command-domain="Infraestructura"]').first().click();
+  await owner.page.locator('.command-inspector h3').getByText('Infraestructura').waitFor();
+  await owner.page.locator('[data-command-ui="close"]').click();
+  await owner.page.locator('[data-command-ui="core"]').click();
+  await owner.page.locator('.command-inspector h3').getByText('Core').waitFor();
+  await owner.page.locator('[data-command-ui="close"]').click();
+  await owner.page.locator('.command-quiet').click();
+  assert.equal(await owner.page.locator('[data-view="overview"]').count()>0,true);
+  assert.equal(await owner.page.locator('#view-title').innerText(),'Comité de Tecnología');
+  await owner.page.locator('[data-view="overview"]').first().click();
   assert.equal(owner.revision(),2);
   assert.ok(owner.stored().verticals.some(x=>x.id==='v-owner-added'));
   const auditDownload=owner.page.waitForEvent('download');
