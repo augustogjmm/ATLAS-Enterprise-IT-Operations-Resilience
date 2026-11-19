@@ -23,7 +23,9 @@ const built=await build({
 });
 const mf=new Miniflare({
   modules:true,script:built.outputFiles[0].text,
-  compatibilityDate:'2026-11-18',
+  // La versión workerd incluida con Miniflare en CI admite fechas hasta 2026-08-06.
+  // Este ajuste es SOLO del test local; la plantilla V5 mantiene su fecha original.
+  compatibilityDate:'2026-08-06',
   d1Databases:{ATLAS_DB:'00000000-0000-0000-0000-000000000005'}
 });
 try{
