@@ -168,7 +168,7 @@ try{
   const auditDownload=owner.page.waitForEvent('download');
   await owner.page.locator('[data-workspace-command="audit-export"]').click();
   const auditFile=await auditDownload;
-  assert.match(auditFile.suggestedFilename(),/^atlas-v5-auditoria-org-demo-.*\\.json$/);
+  assert.match(auditFile.suggestedFilename(),/^atlas-v5-auditoria-org-demo-.*\.json$/);
   const exported=JSON.parse(await (await import('node:fs/promises')).readFile(await auditFile.path(),'utf8'));
   assert.equal(exported.eventCount,2);
   assert.deepEqual(exported.events.map(x=>x.id),['audit-2','audit-1']);
