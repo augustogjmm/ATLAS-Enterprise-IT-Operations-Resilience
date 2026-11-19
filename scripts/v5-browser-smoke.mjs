@@ -43,6 +43,14 @@ try{
         data={role,workspaces:[{id,name:'Gobierno Compartido',revision}]};
       else if(path==='/api/v1/tenants/'+tenant+'/workspaces/'+id&&method==='GET')
         data={id,name:'Gobierno Compartido',revision,state:stored};
+      else if(path==='/api/v1/tenants/'+tenant+'/audit/export'&&method==='GET'){
+        if(!['owner','admin','auditor'].includes(role)){status=403;data={error:'Permiso insuficiente'};}
+        else if(url.searchParams.has('beforeAt'))
+          data={events:[{id:'audit-1',actor_email:'owner@example.test',action:'workspace.created',occurred_at:'2026-11-17T12:00:00.000Z'}],nextCursor:null};
+        else
+          data={events:[{id:'audit-2',actor_email:'owner@example.test',action:'workspace.updated',occurred_at:'2026-11-18T12:00:00.000Z'}],
+            nextCursor:{beforeAt:'2026-11-18T12:00:00.000Z',beforeId:'audit-2'}};
+      }
       else if(path==='/api/v1/tenants/'+tenant+'/workspaces/'+id+'/revisions'&&method==='GET'){
         if(['owner','admin','auditor'].includes(role))
           data={revisions:[{revision,actor_email:'owner@example.test',created_at:'2026-11-18T12:00:00Z'},...(revision>1?[{revision:1,actor_email:'owner@example.test',created_at:'2026-11-18T11:00:00Z'}]:[])],retained:5};
@@ -157,6 +165,15 @@ try{
   await owner.page.getByText('Compartido: Gobierno Compartido').waitFor();
   assert.equal(owner.revision(),2);
   assert.ok(owner.stored().verticals.some(x=>x.id==='v-owner-added'));
+  const auditDownload=owner.page.waitForEvent('download');
+  await owner.page.locator('[data-workspace-command="audit-export"]').click();
+  const auditFile=await auditDownload;
+  assert.match(auditFile.suggestedFilename(),/^atlas-v5-auditoria-org-demo-.*\\.json$/);
+  const exported=JSON.parse(await (await import('node:fs/promises')).readFile(await auditFile.path(),'utf8'));
+  assert.equal(exported.eventCount,2);
+  assert.deepEqual(exported.events.map(x=>x.id),['audit-2','audit-1']);
+  assert.equal(owner.requests.filter(x=>x.path.endsWith('/audit/export')&&x.method==='GET').length,2);
+  assert.equal(owner.requests.filter(x=>x.method==='PUT').length,0,'Exportar auditoría no escribe datos');
   await owner.page.locator('[data-workspace-command="history"]').click();
   await owner.page.locator('#workspace-restore-revision').waitFor();
   assert.equal(await owner.page.locator('#workspace-restore-revision').inputValue(),'1');
