@@ -19,6 +19,7 @@ function fixture() {
     ['org-a','auditor@a.test','auditor'],['org-b','owner@b.test','owner']
   ]) sqlite.prepare("INSERT INTO atlas_memberships(tenant_id,email,role,status,created_at,updated_at) VALUES(?,?,?,'active',?,?)")
     .run(org,email,role,stamp,stamp);
+  let beforeNextBatch=null;
   const binding = {
     prepare(sql) {
       let args=[];
@@ -30,6 +31,9 @@ function fixture() {
       };
     },
     async batch(statements) {
+      // Deterministic interleaving: revocation after memberFor(), before transaction.
+      const hook=beforeNextBatch;beforeNextBatch=null;
+      if(hook)hook(sqlite);
       sqlite.exec('BEGIN');
       try {
         const results=[];
@@ -53,7 +57,7 @@ function fixture() {
     const response=await handler(req,env);
     return {status:response.status,body:await response.json()};
   }
-  return {sqlite,env,call};
+  return {sqlite,env,call,beforeBatch:hook=>{beforeNextBatch=hook;}};
 }
 
 test('multi-tenant: sesión sin permisos sobre otra organización',async()=>{
@@ -249,4 +253,58 @@ test('servidor V5: JSON no puede fabricar cierres de riesgos ni alterar evidenci
   assert.equal((await call('admin@a.test','PUT',endpoint,{revision:3,state:altered})).status,422);
   assert.equal((await call('viewer@a.test','GET',endpoint)).body.revision,3);
   assert.equal(sqlite.prepare('SELECT count(*) AS n FROM atlas_audit_events').get().n,3);
+});
+
+test('revocación concurrente: permisos de editor se verifican DENTRO de la creación D1',async()=>{
+  const {call,sqlite,beforeBatch}=fixture();
+  const root='/api/v1/tenants/org-a/workspaces';
+  beforeBatch(db=>db.prepare(
+    "UPDATE atlas_memberships SET status='revoked' WHERE tenant_id=? AND email=?"
+  ).run('org-a','editor@a.test'));
+  const response=await call('editor@a.test','POST',root,{name:'No se debe crear'});
+  assert.equal(response.status,403);
+  assert.equal(sqlite.prepare('SELECT count(*) AS n FROM atlas_workspaces').get().n,0);
+  assert.equal(sqlite.prepare('SELECT count(*) AS n FROM atlas_workspace_revisions').get().n,0);
+  assert.equal(sqlite.prepare('SELECT count(*) AS n FROM atlas_audit_events').get().n,0);
+});
+
+test('revocación concurrente: escritura iniciada antes de revocar no puede modificar ni auditar',async()=>{
+  const {call,sqlite,beforeBatch}=fixture();
+  const root='/api/v1/tenants/org-a/workspaces';
+  const created=await call('owner@a.test','POST',root,{name:'Protegido',state:makeEmpty()});
+  assert.equal(created.status,201);
+  const path=root+'/'+created.body.id;
+  const altered=makeEmpty();
+  altered.verticals.push({id:'v1',name:'Infraestructura',owner:'IT',description:''});
+  beforeBatch(db=>db.prepare(
+    "UPDATE atlas_memberships SET status='revoked' WHERE tenant_id=? AND email=?"
+  ).run('org-a','editor@a.test'));
+  const response=await call('editor@a.test','PUT',path,{revision:1,state:altered});
+  assert.equal(response.status,403);
+  const current=await call('viewer@a.test','GET',path);
+  assert.equal(current.body.revision,1);
+  assert.deepEqual(current.body.state.verticals,[]);
+  assert.equal(sqlite.prepare('SELECT count(*) AS n FROM atlas_audit_events').get().n,1);
+  assert.equal(sqlite.prepare('SELECT count(*) AS n FROM atlas_workspace_revisions').get().n,1);
+});
+
+test('cambio de rol concurrente: admin degradado no puede restaurar una versión antigua',async()=>{
+  const {call,sqlite,beforeBatch}=fixture();
+  const root='/api/v1/tenants/org-a/workspaces';
+  const created=await call('owner@a.test','POST',root,{name:'Histórico',state:makeEmpty()});
+  assert.equal(created.status,201);
+  const path=root+'/'+created.body.id;
+  const modified=makeEmpty();
+  modified.verticals.push({id:'v1',name:'Plataformas',owner:'IT',description:''});
+  assert.equal((await call('owner@a.test','PUT',path,{revision:1,state:modified})).status,200);
+  beforeBatch(db=>db.prepare(
+    "UPDATE atlas_memberships SET role='viewer' WHERE tenant_id=? AND email=?"
+  ).run('org-a','admin@a.test'));
+  const rejected=await call('admin@a.test','PUT',path+'/revisions/1/restore',{revision:2});
+  assert.equal(rejected.status,403);
+  const current=await call('viewer@a.test','GET',path);
+  assert.equal(current.body.revision,2);
+  assert.deepEqual(current.body.state.verticals.map(v=>v.name),['Plataformas']);
+  assert.equal(sqlite.prepare('SELECT count(*) AS n FROM atlas_audit_events').get().n,2);
+  assert.equal(sqlite.prepare('SELECT count(*) AS n FROM atlas_workspace_revisions').get().n,2);
 });
