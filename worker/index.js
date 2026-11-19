@@ -367,7 +367,7 @@ export function createHandler({verify = verifyAccessToken} = {}) {
         const params=new URL(request.url).searchParams;
         const beforeAt=params.get('beforeAt'),beforeId=params.get('beforeId');
         if ((beforeAt===null)!==(beforeId===null) ||
-          (beforeAt!==null && (!/^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d(?:\\.\\d+)?Z$/.test(beforeAt) ||
+          (beforeAt!==null && (!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z$/.test(beforeAt) ||
             beforeId.length===0 || beforeId.length>100)))
           throw new ApiError('Cursor de auditoría inválido',400);
         const sql='SELECT id,workspace_id,actor_email,action,previous_revision,new_revision,metadata_json,occurred_at FROM atlas_audit_events WHERE tenant_id=?'+
