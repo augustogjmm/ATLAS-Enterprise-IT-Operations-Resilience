@@ -308,3 +308,65 @@ test('cambio de rol concurrente: admin degradado no puede restaurar una versión
   assert.equal(sqlite.prepare('SELECT count(*) AS n FROM atlas_audit_events').get().n,2);
   assert.equal(sqlite.prepare('SELECT count(*) AS n FROM atlas_workspace_revisions').get().n,2);
 });
+
+test('membresías: revocación concurrente del administrador bloquea el alta y su auditoría',async()=>{
+  const {call,sqlite,beforeBatch}=fixture();
+  const path='/api/v1/tenants/org-a/members/new-user@a.test';
+  beforeBatch(db=>db.prepare(
+    "UPDATE atlas_memberships SET status='revoked' WHERE tenant_id=? AND email=?"
+  ).run('org-a','admin@a.test'));
+  const rejected=await call('admin@a.test','PUT',path,{role:'viewer',status:'active'});
+  assert.equal(rejected.status,403);
+  assert.equal(sqlite.prepare(
+    'SELECT COUNT(*) AS n FROM atlas_memberships WHERE tenant_id=? AND email=?'
+  ).get('org-a','new-user@a.test').n,0);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM atlas_audit_events').get().n,0);
+});
+
+test('membresías: rol privilegiado adquirido entre lectura y transacción no puede ser revocado por admin',async()=>{
+  const {call,sqlite,beforeBatch}=fixture();
+  const path='/api/v1/tenants/org-a/members/viewer@a.test';
+  beforeBatch(db=>db.prepare(
+    "UPDATE atlas_memberships SET role='owner' WHERE tenant_id=? AND email=?"
+  ).run('org-a','viewer@a.test'));
+  const denied=await call('admin@a.test','PUT',path,{role:'viewer',status:'revoked'});
+  assert.equal(denied.status,403);
+  const recipient=sqlite.prepare(
+    'SELECT role,status FROM atlas_memberships WHERE tenant_id=? AND email=?'
+  ).get('org-a','viewer@a.test');
+  assert.equal(recipient.role,'owner');
+  assert.equal(recipient.status,'active');
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM atlas_audit_events').get().n,0);
+});
+
+test('membresías: promoción y revocación por owner son atómicas y quedan auditadas',async()=>{
+  const {call,sqlite}=fixture();
+  const path='/api/v1/tenants/org-a/members/new-admin@a.test';
+  const promote=await call('owner@a.test','PUT',path,{role:'admin',status:'active'});
+  assert.equal(promote.status,200);
+  assert.equal((await call('new-admin@a.test','GET','/api/v1/tenants/org-a/workspaces')).status,200);
+  assert.equal((await call('admin@a.test','PUT',path,{role:'viewer',status:'revoked'})).status,403);
+  const revoke=await call('owner@a.test','PUT',path,{role:'admin',status:'revoked'});
+  assert.equal(revoke.status,200);
+  assert.equal((await call('new-admin@a.test','GET','/api/v1/tenants/org-a/workspaces')).status,403);
+  const audits=sqlite.prepare(
+    "SELECT action,metadata_json FROM atlas_audit_events WHERE tenant_id=? ORDER BY occurred_at"
+  ).all('org-a');
+  assert.equal(audits.length,2);
+  assert.deepEqual(audits.map(x=>JSON.parse(x.metadata_json).status),['active','revoked']);
+});
+
+test('membresías: degradación concurrente de admin a viewer bloquea actualización existente',async()=>{
+  const {call,sqlite,beforeBatch}=fixture();
+  const path='/api/v1/tenants/org-a/members/viewer@a.test';
+  beforeBatch(db=>db.prepare(
+    "UPDATE atlas_memberships SET role='viewer' WHERE tenant_id=? AND email=?"
+  ).run('org-a','admin@a.test'));
+  const denied=await call('admin@a.test','PUT',path,{role:'editor',status:'active'});
+  assert.equal(denied.status,403);
+  const target=sqlite.prepare(
+    'SELECT role,status FROM atlas_memberships WHERE tenant_id=? AND email=?'
+  ).get('org-a','viewer@a.test');
+  assert.deepEqual({role:target.role,status:target.status},{role:'viewer',status:'active'});
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM atlas_audit_events').get().n,0);
+});
