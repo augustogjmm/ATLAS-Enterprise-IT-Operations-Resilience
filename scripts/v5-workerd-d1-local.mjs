@@ -46,6 +46,7 @@ try{
       .bind(id,name,stamp).run();
   for(const [tenant,email,role] of [
     ['org-a','owner@a.test','owner'],
+    ['org-a','admin@a.test','admin'],
     ['org-a','editor@a.test','editor'],
     ['org-a','viewer@a.test','viewer'],
     ['org-b','owner@b.test','owner']
@@ -98,6 +99,24 @@ try{
   assert.equal(restored.status,200,JSON.stringify(restored));
   assert.equal(restored.body.revision,3);
   assert.deepEqual((await call('viewer@a.test','GET',path)).body.state.verticals,[]);
+  // La misma sentencia UPSERT de membresía y su auditoría se prueban contra D1 real local.
+  const member='/api/v1/tenants/org-a/members/test-member@a.test';
+  assert.equal((await call('admin@a.test','PUT',member,
+    {role:'viewer',status:'active'})).status,200);
+  assert.equal((await call('test-member@a.test','GET',root)).status,200);
+  assert.equal((await call('admin@a.test','PUT',member,
+    {role:'owner',status:'active'})).status,403);
+  assert.equal((await call('owner@a.test','PUT',member,
+    {role:'admin',status:'active'})).status,200);
+  assert.equal((await call('admin@a.test','PUT',member,
+    {role:'viewer',status:'revoked'})).status,403);
+  assert.equal((await call('owner@a.test','PUT',member,
+    {role:'admin',status:'revoked'})).status,200);
+  assert.equal((await call('test-member@a.test','GET',root)).status,403);
+  const membershipAudits=await db.prepare(
+    "SELECT COUNT(*) AS n FROM atlas_audit_events WHERE tenant_id=? AND action='membership.changed'"
+  ).bind('org-a').first();
+  assert.equal(membershipAudits.n,3);
   assert.equal((await db.prepare("SELECT count(*) AS n FROM sqlite_master WHERE type='table' AND name LIKE 'atlas_%'").first()).n,5);
 
   // D1.batch debe abortar toda la transacción si una sentencia falla.
@@ -108,5 +127,5 @@ try{
   ]));
   const after=await db.prepare('SELECT count(*) AS n FROM atlas_audit_events').first();
   assert.equal(after.n,before.n);
-  console.log('OK V5 workerd/D1: migraciones, roles, concurrencia 409, auditoría, restauración y rollback transaccional en Miniflare local.');
+  console.log('OK V5 workerd/D1: migraciones, roles y membresías, concurrencia 409, auditoría, restauración y rollback transaccional en Miniflare local.');
 }finally{await mf.dispose();}
