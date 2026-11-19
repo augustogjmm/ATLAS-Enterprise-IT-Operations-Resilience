@@ -28,14 +28,27 @@ function teamOrigin(env) {
   } catch { throw new AccessError('Cloudflare Access no configurado', 503); }
 }
 
-async function keysFor(origin, fetcher) {
-  const cached = keyCache.get(origin);
-  if (cached && cached.expires > Date.now()) return cached.keys;
-  const response = await fetcher(origin + '/cdn-cgi/access/certs', { headers: { Accept: 'application/json' } });
-  if (!response.ok) throw new AccessError('No se pudieron obtener claves de Access', 503);
-  const body = await response.json();
-  if (!Array.isArray(body.keys)) throw new AccessError('Certificados Access inválidos', 503);
-  keyCache.set(origin, { keys: body.keys, expires: Date.now() + 5 * 60 * 1000 });
+async function keysFor(origin, fetcher, refresh = false) {
+  const now=Date.now();
+  const cached=keyCache.get(origin);
+  if(cached && cached.expires>now &&
+      (!refresh || (cached.refreshAfter||0)>now))
+    return cached.keys;
+  let response,body;
+  try {
+    response=await fetcher(origin+'/cdn-cgi/access/certs',{
+      headers:{Accept:'application/json'},
+      signal:AbortSignal.timeout(5000)
+    });
+    if(!response.ok)throw new Error('HTTP '+response.status);
+    body=await response.json();
+  } catch {throw new AccessError('No se pudieron obtener claves de Access',503);}
+  if(!Array.isArray(body?.keys)||body.keys.length<1||body.keys.length>64)
+    throw new AccessError('Certificados Access inválidos',503);
+  // Un kid desconocido provoca como máximo una actualización por cada 30 s
+  // evitando solicitudes ilimitadas al endpoint público de claves.
+  keyCache.set(origin,{keys:body.keys,expires:now+5*60*1000,
+    refreshAfter:refresh?now+30*1000:0});
   return body.keys;
 }
 
@@ -49,9 +62,16 @@ export async function verifyAccessToken(request, env, fetcher = fetch) {
   if (segments.length !== 3) throw new AccessError();
   const header = decodeJson(segments[0]);
   const payload = decodeJson(segments[1]);
-  if (header.alg !== 'RS256' || typeof header.kid !== 'string') throw new AccessError();
-  const keys = await keysFor(issuer, fetcher);
-  const jwk = keys.find(k => k.kid === header.kid && k.kty === 'RSA');
+  if (header.alg !== 'RS256' || typeof header.kid !== 'string' ||
+      header.kid.length<1 || header.kid.length>128) throw new AccessError();
+  let keys = await keysFor(issuer, fetcher);
+  let jwk = keys.find(k => k.kid === header.kid && k.kty === 'RSA' &&
+    (!k.alg || k.alg==='RS256'));
+  if (!jwk) {
+    // Cloudflare puede rotar sus claves antes del vencimiento del caché.
+    keys=await keysFor(issuer,fetcher,true);
+    jwk=keys.find(k=>k.kid===header.kid&&k.kty==='RSA'&&(!k.alg||k.alg==='RS256'));
+  }
   if (!jwk) throw new AccessError();
   try {
     const key = await crypto.subtle.importKey('jwk', jwk, {name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256'}, false, ['verify']);
@@ -61,11 +81,14 @@ export async function verifyAccessToken(request, env, fetcher = fetch) {
   const now = Math.floor(Date.now() / 1000);
   const aud = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
   if (payload.iss !== issuer || !aud.includes(env.ACCESS_AUD) ||
-      typeof payload.exp !== 'number' || payload.exp <= now ||
-      (typeof payload.nbf === 'number' && payload.nbf > now) ||
-      (typeof payload.iat === 'number' && payload.iat > now + 60) ||
-      typeof payload.sub !== 'string' || !payload.sub ||
-      typeof payload.email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email))
+      !Number.isSafeInteger(payload.exp) || payload.exp <= now ||
+      !Number.isSafeInteger(payload.iat) || payload.iat > now+60 ||
+      payload.exp <= payload.iat ||
+      (payload.nbf !== undefined &&
+        (!Number.isSafeInteger(payload.nbf) || payload.nbf > now)) ||
+      typeof payload.sub !== 'string' || !payload.sub || payload.sub.length>512 ||
+      typeof payload.email !== 'string' || payload.email.length>254 ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email))
     throw new AccessError();
   return { sub: payload.sub, email: payload.email.trim().toLowerCase(), name: String(payload.name || '').slice(0, 100) };
 }
