@@ -142,3 +142,6 @@ button:focus-visible,a:focus-visible,input:focus-visible,[tabindex]:focus-visibl
 .workspace-tools:not([open]){max-width:max-content}
 .workspace-tools .toolbar,.workspace-tools .workspace-panel{margin-bottom:12px}
 @media(max-width:720px){.workspace-tools>summary{font-size:9px;gap:6px}.workspace-tools>summary span{display:none}}
+
+.sidebar .nav-item .atlas-nav-svg{display:block;flex:0 0 21px;color:inherit;stroke:currentColor}
+.sidebar .nav-item.selected .atlas-nav-svg{stroke:var(--atlas-jade)}
