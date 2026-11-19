@@ -5,6 +5,7 @@ import {mkdtempSync,readFileSync,copyFileSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createHash} from 'node:crypto';
+import {createBackupManifest,verifyBackupManifest,verifyRestoredCounts} from './v5-backup-integrity.mjs';
 import {DatabaseSync} from 'node:sqlite';
 import {createHandler} from '../worker/index.js';
 import {makeEmpty} from '../src/governance/core.js';
@@ -80,18 +81,27 @@ try {
  // El comando VACUUM INTO es solo una herramienta para el ensayo SQLite local,
  // NO se debe utilizar como procedimiento de exportación directo contra Cloudflare D1.
  db.exec("VACUUM INTO '"+backup.replaceAll("'","''")+"'");
- const originalChecksum=checksum(readFileSync(backup));
- assert.match(originalChecksum,/^[a-f0-9]{64}$/);
- const mutated=Buffer.from(readFileSync(backup));
- mutated[0]^=0x01;
- assert.notEqual(checksum(mutated),originalChecksum,
-  'Un artefacto alterado debe ser detectado por checksum');
+ const backupBytes=readFileSync(backup);
+ const counts=Object.fromEntries(['atlas_tenants','atlas_memberships','atlas_workspaces',
+  'atlas_audit_events','atlas_workspace_revisions'].map(table=>
+  [table,db.prepare('SELECT COUNT(*) AS count FROM '+table).get().count]));
+ const manifest=createBackupManifest(backupBytes,{counts});
+ const originalChecksum=checksum(backupBytes);
+ assert.equal(manifest.sha256,originalChecksum);
+ assert.equal(verifyBackupManifest(backupBytes,manifest).byteLength,backupBytes.length);
+ const mutated=Buffer.from(backupBytes);mutated[0]^=0x01;
+ assert.throws(()=>verifyBackupManifest(mutated,manifest),/SHA-256/);
+ const truncated=backupBytes.subarray(0,backupBytes.length-1);
+ assert.throws(()=>verifyBackupManifest(truncated,manifest),/tamaño/);
  db.close();db=null;
+ // Regla fail-closed: verificar bytes ANTES de abrir el archivo restaurado.
  copyFileSync(backup,restore);
+ verifyBackupManifest(readFileSync(restore),manifest);
  assert.equal(checksum(readFileSync(restore)),originalChecksum);
  restored=new DatabaseSync(restore);
  restored.exec('PRAGMA foreign_keys=ON');
  integrity(restored);
+ assert.equal(verifyRestoredCounts(restored,manifest),true);
  const loaded=await api(restored,'GET',path);
  assert.equal(loaded.status,200);
  assert.equal(loaded.body.revision,2);
@@ -115,7 +125,7 @@ try {
  assert.equal(audit.status,200);
  assert.deepEqual(audit.body.events.map(x=>x.action).sort(),
   ['workspace.created','workspace.restored','workspace.updated','workspace.updated']);
- console.log('OK V5 DR local: SQLite exportado, checksum SHA-256, restore separado, integridad FK, lectura/escritura y restauración histórica con Worker real.');
+ console.log('OK V5 DR local: manifiesto SHA-256/tamaño/conteos, rechazo de corrupción y truncamiento, restauración separada, FK, lectura/escritura y recuperación histórica.');
 }finally{
  try{db?.close();}catch{}
  try{restored?.close();}catch{}
