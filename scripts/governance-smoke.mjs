@@ -25,8 +25,11 @@ try{
  const page=await browser.newPage({viewport:{width:1440,height:900},acceptDownloads:true});
  page.on('pageerror',error=>errors.push('desktop: '+error.message));
  await page.goto(url,{waitUntil:'networkidle'});
+ await page.locator('#workspace-tools').evaluate(el=>el.open=true);
  assert.match(await page.title(),/Gobierno/);
- assert.match(await page.locator('h1').innerText(),/Gobernar la operación/i);
+ assert.match(await page.locator('.command-hero h1').innerText(),/Visibilidad para decidir/i);
+ assert.equal(await page.locator('.command-domain').count(),8);
+ await page.locator('button[data-view="operations"]').click();
  assert.equal(await page.locator('link[href="./executive.css"]').count(),1);
  assert.ok(await page.locator('.executive-summary').isVisible());
  assert.equal(await page.locator('.executive-kpi').count(),4);
@@ -37,7 +40,7 @@ try{
  const executiveSkin=await page.locator('.page-frame').evaluate(el=>getComputedStyle(el).backgroundColor);
  assert.ok(executiveSkin!=='rgb(0, 0, 0)');
  assert.equal((await page.locator('.executive-kpi strong').allInnerTexts())[0],'1');
- assert.ok(await page.getByText('De la brecha a la acción').isVisible());
+ assert.equal(await page.locator('#view-title').innerText(),'Análisis operativo');
  await page.screenshot({path:resolve(artifacts,'atlas-governance-desktop.png'),fullPage:true});
  // Ingestión ITSM: importar dos incidentes, calcular recuperación, cerrar y persistir.
  await page.locator('button[data-view="incidents"]').click();
@@ -50,7 +53,7 @@ try{
  'CSV-E2E-02,s-channel,P1,2026-11-18T12:30:00-03:00,,Incidente pendiente'
  ].join(String.fromCharCode(10));
  await page.locator('#incident-file').setInputFiles({name:'importacion-itsm-smoke.csv',mimeType:'text/csv',buffer:Buffer.from(incidentCSV)});
- assert.ok(await page.locator('#incident-mapping-form').isVisible());
+ await page.locator('#incident-mapping-form').waitFor({state:'visible'});
  assert.equal(await page.locator('[name="col_incident_id"]').inputValue(),'0');
  assert.equal(await page.locator('[name="service_0"]').inputValue(),'s-channel');
  assert.equal(await page.locator('[name="service_1"]').inputValue(),'s-core');
@@ -78,7 +81,7 @@ try{
   'EXT-SMOKE-01;Core transaccional;Alta;18/11/2026 08:00;18/11/2026 08:40;Incidente de mapeo'
  ].join(String.fromCharCode(10));
  await page.locator('#incident-file').setInputFiles({name:'formato-externo.csv',mimeType:'text/csv',buffer:Buffer.from(external)});
- assert.ok(await page.locator('#incident-mapping-form').isVisible());
+ await page.locator('#incident-mapping-form').waitFor({state:'visible'});
  assert.equal(await page.locator('[name="col_summary"]').inputValue(),'5');
  assert.equal(await page.locator('[name="service_0"]').inputValue(),'s-core');
  await page.locator('[name="priority_0"]').selectOption('P1');
@@ -180,6 +183,7 @@ try{
 
  // Persistencia y exportación
  await page.reload({waitUntil:'networkidle'});
+  await page.locator('#workspace-tools').evaluate(el=>el.open=true);
  await page.locator('button[data-view="incidents"]').click();
  assert.equal(await page.locator('tr').filter({hasText:'CSV-E2E-01'}).count(),1);
  assert.equal(await page.locator('tr').filter({hasText:'CSV-E2E-02'}).count(),1);
@@ -208,6 +212,9 @@ try{
  const mobile=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
  mobile.on('pageerror',error=>errors.push('mobile: '+error.message));
  await mobile.goto(url,{waitUntil:'networkidle'});
+ await mobile.locator('#workspace-tools').evaluate(el=>el.open=true);
+ assert.equal(await mobile.locator('.command-domain').count(),8);
+ await mobile.locator('button[data-view="operations"]').click();
  assert.equal((await mobile.locator('.executive-kpi strong').allInnerTexts())[0],'1');
  assert.equal(await mobile.locator('.heatmap-cell').count(),25);
  await mobile.locator('button[data-view="incidents"]').click();

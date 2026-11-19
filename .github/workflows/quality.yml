@@ -1,8 +1,11 @@
 name: ATLAS · Calidad y reproducibilidad
 on:
   push:
-    branches: [main, feature/**]
+    branches: [main]
   pull_request:
+concurrency:
+  group: atlas-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -14,6 +17,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: "V5: control obligatorio de arquitectura 100% Free"
+        run: node scripts/v5-zero-cost-gate.mjs
+      - name: "V5: preflight de secretos, despliegues y recuperación"
+        run: node scripts/v5-release-preflight.mjs
       - name: Verificación de sintaxis
         run: npm run check
       - name: Pruebas del motor de simulación
@@ -23,6 +30,9 @@ jobs:
       - name: Verificación de archivos generados
         run: |
           test -f dist/index.html
+          test -f dist/v5-ui.js
+          test -f dist/remote-workspaces.js
+          test -f dist/remote-workspaces.css
           test -f dist/governance.js
           test -f dist/governance.css
           test -f dist/lib/governance/core.js
@@ -43,13 +53,21 @@ jobs:
           test -f dist/lib/engine.js
       - name: Usar Chrome preinstalado para pruebas de navegador
         run: |
-          npm install --no-save playwright@1.55.0
+          npm install --no-save --no-package-lock playwright@1.55.0 miniflare@4 esbuild@0.25.12
           command -v google-chrome
           google-chrome --version
+      - name: "Probar V5 en workerd y D1 local con Miniflare"
+        run: node scripts/v5-workerd-d1-local.mjs
       - name: Probar interfaz, escenarios y exportación en Chromium
         run: node scripts/browser-smoke.mjs
       - name: Probar gobierno, riesgos, planes y persistencia en Chromium
         run: node scripts/governance-smoke.mjs
+      - name: "Probar V5: sesión remota, permisos, conflictos y recuperación local"
+        run: node scripts/v5-browser-smoke.mjs
+      - name: "Probar V5 multiusuario: Worker, SQLite, concurrencia y revocación"
+        run: node scripts/v5-multiuser-smoke.mjs
+      - name: "Probar V5: restauración aislada de backup SQLite"
+        run: node scripts/v5-recovery-drill.mjs
       - name: Guardar capturas de pantalla de revisión
         if: always()
         uses: actions/upload-artifact@v4
@@ -58,4 +76,48 @@ jobs:
           path: test-artifacts/
           if-no-files-found: ignore
           retention-days: 7
-      # Sin credenciales, APIs productivas ni despliegue. Instalación de Playwright solo en CI.
+      - name: Generar paquete de publicación ATLAS V5 (frontend)
+        if: success()
+        run: |
+          test -f dist/index.html
+          test -f dist/atlas-v4-system.css
+          test -f dist/executive-command.js
+          test -f dist/atlas-shell.js
+          node --input-type=module -e "
+            import {readFileSync,writeFileSync} from 'node:fs';
+            import {createHash} from 'node:crypto';
+            const files=['index.html','atlas-v4-system.css','executive-command.js','atlas-shell.js'];
+            const digests=Object.fromEntries(files.map(f=>[f,createHash('sha256').update(readFileSync('dist/'+f)).digest('hex')]));
+            writeFileSync('dist/atlas-v5-release.json',JSON.stringify({
+              product:'ATLAS V5',mode:'frontend-local',commit:process.env.GITHUB_SHA,
+              backend:'No disponible sin Cloudflare Access y D1',
+              files:digests
+            },null,2));
+          "
+      - name: Preparar distribución estática para el Worker público existente
+        if: success()
+        run: |
+          mkdir -p release/atlas-v5-public
+          cp -a dist release/atlas-v5-public/dist
+          cat > release/atlas-v5-public/wrangler.atlas-public.jsonc <<'EOF'
+          {
+            "name": "atlas-enterprise-it-operations-resilience",
+            "compatibility_date": "2026-11-18",
+            "assets": {
+              "directory": "./dist",
+              "run_worker_first": false,
+              "not_found_handling": "404-page"
+            }
+          }
+          EOF
+          cp docs/LEEME_PUBLICAR_FRONTEND_V5.txt release/atlas-v5-public/LEEME-PUBLICAR.txt
+      - name: Entregar ZIP listo para despliegue manual sin credenciales
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-v5-publicacion-frontend
+          path: release/atlas-v5-public/
+          if-no-files-found: error
+          retention-days: 30
+      # Paquete sólo frontend; este workflow NO despliega ni crea recursos de Cloudflare.
+
