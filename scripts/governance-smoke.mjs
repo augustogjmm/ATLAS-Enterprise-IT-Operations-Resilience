@@ -50,7 +50,7 @@ try{
  'CSV-E2E-02,s-channel,P1,2026-11-18T12:30:00-03:00,,Incidente pendiente'
  ].join(String.fromCharCode(10));
  await page.locator('#incident-file').setInputFiles({name:'importacion-itsm-smoke.csv',mimeType:'text/csv',buffer:Buffer.from(incidentCSV)});
- assert.ok(await page.locator('#incident-mapping-form').isVisible());
+ await page.locator('#incident-mapping-form').waitFor({state:'visible'});
  assert.equal(await page.locator('[name="col_incident_id"]').inputValue(),'0');
  assert.equal(await page.locator('[name="service_0"]').inputValue(),'s-channel');
  assert.equal(await page.locator('[name="service_1"]').inputValue(),'s-core');
@@ -78,7 +78,7 @@ try{
   'EXT-SMOKE-01;Core transaccional;Alta;18/11/2026 08:00;18/11/2026 08:40;Incidente de mapeo'
  ].join(String.fromCharCode(10));
  await page.locator('#incident-file').setInputFiles({name:'formato-externo.csv',mimeType:'text/csv',buffer:Buffer.from(external)});
- assert.ok(await page.locator('#incident-mapping-form').isVisible());
+ await page.locator('#incident-mapping-form').waitFor({state:'visible'});
  assert.equal(await page.locator('[name="col_summary"]').inputValue(),'5');
  assert.equal(await page.locator('[name="service_0"]').inputValue(),'s-core');
  await page.locator('[name="priority_0"]').selectOption('P1');
