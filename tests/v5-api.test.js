@@ -379,3 +379,42 @@ test('membresías: degradación concurrente de admin a viewer bloquea actualizac
   assert.deepEqual({role:target.role,status:target.status},{role:'viewer',status:'active'});
   assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM atlas_audit_events').get().n,0);
 });
+
+test('API: rechaza null, listas y escalares con HTTP 400 en las cuatro rutas de escritura',async()=>{
+  const {call,sqlite}=fixture();
+  const root='/api/v1/tenants/org-a/workspaces';
+  const created=await call('owner@a.test','POST',root,{name:'Respaldo control',state:makeEmpty()});
+  assert.equal(created.status,201);
+  const workspace=root+'/'+created.body.id;
+  const paths=[
+    ['POST',root],
+    ['PUT',workspace],
+    ['PUT',workspace+'/revisions/1/restore'],
+    ['PUT','/api/v1/tenants/org-a/members/new-person@a.test']
+  ];
+  for(const payload of [null,[],[1],'texto',42,true,false]){
+    for(const [method,path] of paths){
+      const response=await call('owner@a.test',method,path,payload);
+      assert.equal(response.status,400,method+' '+path+' cuerpo '+JSON.stringify(payload));
+      assert.match(response.body.error,/objeto JSON/);
+    }
+  }
+  assert.equal(sqlite.prepare('SELECT revision FROM atlas_workspaces WHERE id=?')
+    .get(created.body.id).revision,1);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM atlas_audit_events').get().n,1);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM atlas_workspace_revisions').get().n,1);
+  assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM atlas_memberships WHERE email='new-person@a.test'").get().n,0);
+});
+
+test('API: secuencia de escape inválida en un correo responde 400 sin error interno',async()=>{
+  const {call,sqlite}=fixture();
+  const malformed=await call('owner@a.test','PUT',
+    '/api/v1/tenants/org-a/members/%',{role:'viewer',status:'active'});
+  assert.equal(malformed.status,400);
+  assert.equal(malformed.body.error,'Correo inválido');
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM atlas_audit_events').get().n,0);
+  const valid=await call('owner@a.test','PUT',
+    '/api/v1/tenants/org-a/members/new-person%40a.test',{role:'viewer',status:'active'});
+  assert.equal(valid.status,200);
+  assert.equal(valid.body.email,'new-person@a.test');
+});

@@ -94,7 +94,7 @@ La tabla de revisiones deberá conservar como máximo 5 entradas por workspace. 
 | Síntoma | Acción segura |
 |---|---|
 | Access 401/403 | Comprobar equipo/audiencia, política, JWT, membresía y su asociación `access_sub`; no desactivar Access |
-| HTTP 409 | Usar «Verificar guardado en servidor». Si los datos remotos difieren, exportar cambios no confirmados y reconciliar manualmente; no repetir el PUT automáticamente |
+| HTTP 400 (JSON o correo inválido) | Verificar que el cuerpo de la solicitud sea un objeto JSON, no `null`, una lista ni un valor simple; revisar el formato y codificación del correo. El backend rechaza estos datos sin mutar registros ni dejar una auditoría de éxito |\n| HTTP 409 | Usar «Verificar guardado en servidor». Si los datos remotos difieren, exportar cambios no confirmados y reconciliar manualmente; no repetir el PUT automáticamente |
 | HTTP 422 | Revisar evidencia y reglas de cierre; no forzar escritura directa en SQL |
 | HTTP 429 | Se alcanzó el cupo de workspaces; revisar capacidad antes de cambiar el límite |
 | HTTP 503 | D1 o configuración de Access no disponible; mantener V4 local como alternativa |

@@ -70,8 +70,14 @@ async function readBody(request) {
   } finally {reader.releaseLock();}
   const buffer=new Uint8Array(bytes);let offset=0;
   for (const chunk of chunks) {buffer.set(chunk,offset);offset+=chunk.byteLength;}
-  try { return JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(buffer)); }
+  let data;
+  try { data=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(buffer)); }
   catch { throw new ApiError('JSON inválido'); }
+  // Todas las rutas mutadoras esperan propiedades de un objeto; null,
+  // listas y escalares deben responder 400, nunca un error interno 500.
+  if (!data || typeof data!=='object' || Array.isArray(data))
+    throw new ApiError('El cuerpo JSON debe ser un objeto',400);
+  return data;
 }
 async function memberFor(db, tenantId, identity) {
   if (!validId(tenantId)) throw new ApiError('Organización inválida', 404);
@@ -317,7 +323,9 @@ export function createHandler({verify = verifyAccessToken} = {}) {
       }
       if (resource==='members' && path.length===6 && request.method==='PUT') {
         requirePermission(member.role,'members');
-        const email=decodeURIComponent(path[5]).trim().toLowerCase();
+        let email;
+        try { email=decodeURIComponent(path[5]).trim().toLowerCase(); }
+        catch { throw new ApiError('Correo inválido',400); }
         if (!validEmail(email)) throw new ApiError('Correo inválido');
         if (email===identity.email) throw new ApiError('No podés modificar tu propio acceso',403);
         const data=await readBody(request);
