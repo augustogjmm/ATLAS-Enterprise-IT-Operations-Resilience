@@ -45,7 +45,7 @@ Todos los permisos se verifican en el **servidor**, nunca solo en botones. Cada 
 
 ### 3. Persistencia
 
-Migración `migrations/0001_atlas_v5.sql`:
+Migración `migrations/0001_atlas_v5.sql` (sin `PRAGMA foreign_keys=ON` porque D1 impone integridad referencial y no permite ejecutar esa sentencia; en SQLite nativo los fixtures la habilitan):
 
 - `atlas_tenants`: organizaciones activas/suspendidas.
 - `atlas_memberships`: correo, `sub` verificado, rol, estado.
