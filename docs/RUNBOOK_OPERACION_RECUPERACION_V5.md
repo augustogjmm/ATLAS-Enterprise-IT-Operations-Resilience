@@ -117,3 +117,12 @@ La tabla de revisiones deberá conservar como máximo 5 entradas por workspace. 
 ## 8. Criterios de cierre de homologación
 
 Una homologación satisfactoria exige pruebas de **dos identidades reales** en el runtime Cloudflare, deny-by-default, persistencia D1 consistente, recuperación verificada, respaldo descargable, métricas de consumo y ejecución de la suite CI. Los tests locales actuales cubren lógica y rutas, pero **no satisfacen por sí solos** ese criterio.
+
+
+## Exportación completa de auditoría desde la interfaz
+
+En un workspace remoto, un miembro con rol `owner`, `admin` o `auditor` puede seleccionar **Exportar auditoría completa**. La interfaz consulta páginas de hasta 100 eventos con cursor `beforeAt/beforeId` y entrega **un solo JSON** al finalizar correctamente todas las consultas. Si falla una página o aparecen identificadores repetidos, no entrega un archivo parcial.
+
+El JSON contiene `tenantId`, fecha de exportación, conteo, advertencia sobre concurrencia y lista de eventos. **Contiene correos de usuarios**, por lo que debe almacenarse de forma privada. Verificar el conteo y calcular/verificar un hash SHA-256 del archivo al archivarlo. El archivo descargado **no es un backup de D1** ni una auditoría WORM. Al ser una lectura paginada, no garantiza consistencia transaccional frente a altas simultáneas: para un cierre de evidencia, suspender escrituras y comparar el conteo con la base antes y después.
+
+La UI no borra ni rota registros; si se alcanza el máximo global de 2.000, las escrituras permanecen bloqueadas. La política de archivo, recuperación de evidencia y desbloqueo exige un procedimiento administrativo aprobado, todavía pendiente. No utilizar datos reales en esta demo sin completar homologación.
