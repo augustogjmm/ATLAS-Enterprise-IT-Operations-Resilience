@@ -597,3 +597,34 @@ test('costo cero: auditoría global se satura en 2000 eventos y congela todas la
   const logs=await call('auditor@a.test','GET','/api/v1/tenants/org-a/audit');
   assert.equal(logs.status,200,'La bitácora debe permanecer consultable al saturarse');
 });
+
+test('exportación de auditoría: páginas completas sin repetición, aislamiento y permisos',async()=>{
+  const {call,sqlite}=fixture();
+  const insert=sqlite.prepare(
+    'INSERT INTO atlas_audit_events(id,tenant_id,workspace_id,actor_email,action,metadata_json,occurred_at) VALUES(?,?,?,?,?,?,?)'
+  );
+  for(let i=0;i<205;i++) insert.run(
+    'event-'+String(i).padStart(4,'0'),'org-a',null,'owner@a.test','workspace.test','{}',
+    '2026-11-18T12:00:00.000Z'
+  );
+  insert.run('other-tenant','org-b',null,'owner@b.test','workspace.test','{}','2026-11-18T12:00:00.000Z');
+  const base='/api/v1/tenants/org-a/audit/export';
+  assert.equal((await call('editor@a.test','GET',base)).status,403);
+  assert.equal((await call('viewer@a.test','GET',base)).status,403);
+  assert.equal((await call('auditor@a.test','GET','/api/v1/tenants/org-b/audit/export')).status,403);
+  assert.equal((await call('auditor@a.test','GET',base+'?beforeAt=wrong&beforeId=x')).status,400);
+  const collected=[];
+  let cursor=null;
+  for(let pageNumber=0;pageNumber<4;pageNumber++){
+    const query=cursor?'?beforeAt='+encodeURIComponent(cursor.beforeAt)+'&beforeId='+encodeURIComponent(cursor.beforeId):'';
+    const page=await call('auditor@a.test','GET',base+query);
+    assert.equal(page.status,200);
+    collected.push(...page.body.events.map(e=>e.id));
+    cursor=page.body.nextCursor;
+    if(!cursor)break;
+  }
+  assert.equal(collected.length,205);
+  assert.equal(new Set(collected).size,205);
+  assert.equal(collected.includes('other-tenant'),false);
+  assert.equal(cursor,null);
+});
