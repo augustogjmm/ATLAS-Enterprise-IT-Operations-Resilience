@@ -6,3 +6,14 @@ dist/
 !.env.example
 .DS_Store
 *.log
+
+# V5: credenciales Access / configuración local / SQLite/D1 emulados.
+.dev.vars
+.dev.vars.*
+.wrangler/
+.miniflare/
+.mf/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+test-artifacts/
