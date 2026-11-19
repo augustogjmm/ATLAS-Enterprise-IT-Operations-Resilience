@@ -51,7 +51,7 @@ jobs:
           test -f dist/lib/engine.js
       - name: Usar Chrome preinstalado para pruebas de navegador
         run: |
-          npm install --no-save playwright@1.55.0
+          npm install --no-save --no-package-lock playwright@1.55.0 miniflare@4 esbuild@0.25.12
           command -v google-chrome
           google-chrome --version
       - name: Probar interfaz, escenarios y exportación en Chromium
@@ -64,6 +64,8 @@ jobs:
         run: node scripts/v5-multiuser-smoke.mjs
       - name: "Probar V5: restauración aislada de backup SQLite"
         run: node scripts/v5-recovery-drill.mjs
+      - name: "Probar V5 en workerd y D1 local con Miniflare"
+        run: node scripts/v5-workerd-d1-local.mjs
       - name: Guardar capturas de pantalla de revisión
         if: always()
         uses: actions/upload-artifact@v4
