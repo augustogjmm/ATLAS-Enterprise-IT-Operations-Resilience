@@ -43,8 +43,12 @@
  </aside>
  <div class="page-frame">
   <header class="topbar">
-   <div class="breadcrumb">ATLAS <span>/</span> TECHNOLOGY MANAGEMENT <span>/</span> <strong id="breadcrumb-current">GOBIERNO EJECUTIVO</strong></div>
-   <div class="top-actions"><span class="top-status"><span class="indicator"></span> DEMO OPERATIVA</span><a class="source-link" href="https://github.com/augustogjmm/ATLAS-Enterprise-IT-Operations-Resilience" target="_blank" rel="noopener noreferrer">Código ↗</a></div>
+   <div class="breadcrumb"><strong>ATLAS</strong> <span>/</span> TECHNOLOGY COMMAND <span class="command-header-divider">│</span> <span id="atlas-organization">Workspace local</span><span class="sr-only" id="breadcrumb-current">GOBIERNO EJECUTIVO</span></div>
+   <div class="top-actions"><span class="top-status"><span class="indicator"></span> <span id="atlas-session">MODO DEMOSTRACIÓN</span></span>
+    <button class="atlas-top-icon" type="button" id="atlas-search-open" title="Buscar (Ctrl+K)" aria-label="Búsqueda global">⌕</button>
+    <button class="atlas-top-icon" type="button" id="atlas-notifications-open" aria-label="Notificaciones y pendientes">♧</button>
+    <button class="atlas-top-avatar" type="button" id="atlas-profile-open" title="Mostrar workspace y sesión" aria-label="Mostrar workspace y sesión">AT</button>
+   </div>
   </header>
   <main id="main" tabindex="-1">
    <div class="main-wrap">
@@ -77,6 +81,16 @@
   <div id="form-fields" class="form-fields"></div>
   <div class="dialog-foot"><button class="button button-subtle" type="button" id="dialog-cancel">Cancelar</button><button class="button button-primary" id="dialog-submit" type="submit">Guardar registro</button></div>
  </form>
+</dialog>
+<dialog id="atlas-search" class="atlas-modal" aria-label="Búsqueda global de ATLAS">
+ <div class="atlas-modal-head"><label for="atlas-search-input">Búsqueda global</label><button type="button" data-shell-close aria-label="Cerrar búsqueda">×</button></div>
+ <input id="atlas-search-input" type="search" placeholder="Buscar Core, dominios, riesgos, decisiones..." autocomplete="off">
+ <div id="atlas-search-results" class="atlas-modal-results" aria-live="polite"></div>
+</dialog>
+<dialog id="atlas-notifications" class="atlas-modal" aria-label="Pendientes ejecutivos">
+ <div class="atlas-modal-head"><strong>Notificaciones y pendientes</strong><button type="button" data-shell-close aria-label="Cerrar notificaciones">×</button></div>
+ <p class="atlas-modal-disclaimer">Resumen de registros del workspace, no alertas en tiempo real.</p>
+ <div id="atlas-notifications-results" class="atlas-modal-results"></div>
 </dialog>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 </body>
