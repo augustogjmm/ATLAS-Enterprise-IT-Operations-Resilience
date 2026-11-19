@@ -4,7 +4,7 @@ import {RemoteWorkspaces,canEditWorkspace,canAudit,canManageMembers,canRestore} 
 export function mountRemoteV5({getState,getLocal,replaceState,notice,validateState}) {
   const api=new RemoteWorkspaces();
   const s={session:null,tenant:'',workspaces:[],choice:'',role:'',id:'',name:'',revision:0,
-    busy:false,conflict:false,error:'',details:'',revisions:[]};
+    busy:false,conflict:false,error:'',details:'',revisions:[],pending:null};
   const active=()=>Boolean(s.id);
   const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const option=(id,title,selected)=>'<option value="'+esc(id)+'"'+(id===selected?' selected':'')+'>'+esc(title)+'</option>';
@@ -33,7 +33,10 @@ export function mountRemoteV5({getState,getLocal,replaceState,notice,validateSta
       }
     }
     if(active())out+=button('local','Volver a V4 local',s.busy);
-    if(s.conflict)out+=button('backup','Exportar cambios',false);
+    if(s.conflict){
+      if(s.pending&&active())out+=button('verify','Verificar guardado en servidor',s.busy);
+      out+=button('backup','Exportar cambios',false);
+    }
     if(s.error)out+='<div class="workspace-warning"><strong>Atención:</strong> '+esc(s.error)+'</div>';
     out+='<span class="workspace-help">La conexión es opcional. No se cargan datos locales al servidor sin tu autorización.</span>';
     if(s.details)out+='<div class="workspace-break"></div><div class="workspace-details">'+s.details+'</div>';
@@ -78,12 +81,15 @@ export function mountRemoteV5({getState,getLocal,replaceState,notice,validateSta
   async function persist(state,message){
     if(!active()||!permitted())return false;
     const tenant=s.tenant,id=s.id,rev=s.revision,copy=structuredClone(state);
+    // Si se pierde el ACK, conservar exactamente el intento para compararlo con D1.
+    // Nunca volver a ejecutar un PUT automáticamente: podría duplicar cambios/auditoría.
+    s.pending={tenant,id,revision:rev,state:copy};
     s.busy=true;s.error='';render();
     try{
       const result=await api.save(tenant,id,rev,copy);
       if(!Number.isSafeInteger(result.revision)||result.revision!==rev+1)
         throw new Error('Revisión inesperada; se requiere reconciliación.');
-      s.revision=result.revision;s.conflict=false;
+      s.revision=result.revision;s.conflict=false;s.pending=null;
       notice(message||'Revisión '+s.revision+' guardada correctamente.');
       return true;
     }catch(err){
@@ -121,7 +127,7 @@ export function mountRemoteV5({getState,getLocal,replaceState,notice,validateSta
       }
       if(command==='local'){
         if(s.conflict&&!confirm('Existen cambios sin confirmar. Exportá un respaldo antes de descartarlos. ¿Volver al modo local?'))return;
-        s.id='';s.name='';s.revision=0;s.conflict=false;s.error='';s.details='';s.revisions=[];
+        s.id='';s.name='';s.revision=0;s.conflict=false;s.error='';s.details='';s.revisions=[];s.pending=null;
         replaceState(getLocal());render();
         notice('V4 local restaurada sin sobrescribir datos remotos.');
         return;
@@ -134,7 +140,7 @@ export function mountRemoteV5({getState,getLocal,replaceState,notice,validateSta
         const data=validateState(item.state);
         replaceState(data);
         s.id=item.id;s.name=item.name;s.revision=item.revision;
-        s.conflict=false;s.error='';s.details='';s.revisions=[];
+        s.conflict=false;s.error='';s.details='';s.revisions=[];s.pending=null;
         notice('Workspace V5 cargado. Revisión '+s.revision+'.');return;
       }
       if(command==='create'){
@@ -158,6 +164,26 @@ export function mountRemoteV5({getState,getLocal,replaceState,notice,validateSta
         // La confirmación sobre cambios sin guardar se realiza una sola vez en «open».
         // Doble confirm() bloqueaba la recuperación tras un 409.
         s.choice=s.id;await act('open');return;
+      }
+      if(command==='verify'&&active()&&s.conflict&&s.pending){
+        const attempt=s.pending;
+        // Comparación de SOLO lectura: no sobrescribe nada y no genera auditoría.
+        s.busy=true;s.error='';render();
+        const record=await api.open(attempt.tenant,attempt.id);
+        if(s.tenant!==attempt.tenant||s.id!==attempt.id)
+          throw new Error('El workspace seleccionado cambió. No se realizó reconciliación.');
+        const checked=validateState(record.state);
+        if(JSON.stringify(checked)===JSON.stringify(attempt.state)){
+          s.revision=record.revision;s.pending=null;s.conflict=false;s.error='';s.details='';
+          notice('El servidor conserva los mismos datos enviados. Revisión '+record.revision+
+            ' verificada mediante lectura, sin repetir la escritura.');
+        }else{
+          s.error='El servidor conserva una versión diferente (revisión '+
+            record.revision+'). Los cambios actuales siguen sin confirmarse. '+
+            'Exportá el respaldo antes de recargar o reconciliar manualmente.';
+          notice(s.error,true);
+        }
+        return;
       }
       if(command==='history'&&active()&&canAudit(s.role)){
         s.busy=true;render();
@@ -187,7 +213,7 @@ export function mountRemoteV5({getState,getLocal,replaceState,notice,validateSta
           s.revision=current.revision;s.conflict=false;s.details='';s.revisions=[];
           notice('Revisión '+target+' restaurada como nueva revisión '+current.revision+'.');
         }catch(err){
-          s.conflict=true;
+          s.pending=null;s.conflict=true;
           s.error='La restauración no pudo verificarse. Evitá nuevas escrituras, exportá tus datos y recargá el workspace: '+(err.message||'fallo remoto');
           notice(s.error,true);
         }
