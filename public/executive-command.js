@@ -14,6 +14,18 @@ export const ATLAS_DOMAINS=[
 ];
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const d2=v=>String(v).padStart(2,'0');
+
+const glyphs={
+ server:'<rect x="4" y="4" width="16" height="7" rx="2"/><rect x="4" y="13" width="16" height="7" rx="2"/><path d="M7 7h.01M7 16h.01M11 7h6M11 16h6"/>',
+ network:'<circle cx="12" cy="4" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="M12 6v5M12 11l-7 6M12 11l7 6"/>',
+ shield:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/>',
+ infinity:'<path d="M6 16c-5 0-5-8 0-8 5 0 7 8 12 8s5-8 0-8-7 8-12 8Z"/>',
+ cloud:'<path d="M20 17H7a4 4 0 0 1-1-7.9A6 6 0 0 1 17.4 10 3.5 3.5 0 0 1 20 17Z"/>',
+ apps:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+ database:'<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 4 16 4 16 0V5M4 12c0 4 16 4 16 0"/>'
+};
+const iconSvg=name=>'<svg class="command-glyph" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true">'+(glyphs[name]||glyphs.network)+'</svg>';
+
 const pct=v=>Number.isFinite(v)?new Intl.NumberFormat('es-AR',{maximumFractionDigits:2,minimumFractionDigits:2}).format(v)+'%':'Sin datos';
 const empty='Sin datos';
 let lens='Panorama',selected='',selectedDecision='';
@@ -65,7 +77,7 @@ function domainDetail(d){
 export function renderExecutiveCommand(s){
  const m=executiveModel(s);const left=m.domains.slice(0,4),right=m.domains.slice(4);
  const domainButton=d=>'<button type="button" class="command-domain '+(d.status==='Seguimiento'?'is-watch ':'')+(selected===d.name?'is-selected':'')+
-  '" data-command-domain="'+esc(d.name)+'" aria-pressed="'+(selected===d.name)+'"><strong>'+esc(d.name)+'</strong><small>'+esc(domainSub(d))+'</small><span>'+esc(d.status)+'</span></button>';
+  '" data-command-domain="'+esc(d.name)+'" aria-pressed="'+(selected===d.name)+'"><span class="command-domain-icon">'+iconSvg(d.icon)+'</span><span class="command-domain-copy"><strong>'+esc(d.name)+'</strong><small>'+esc(domainSub(d))+'</small><span class="command-domain-state">'+esc(d.status)+'</span></span></button>';
  const kpis=[['Disponibilidad',pct(m.availability)],['Componentes críticos',String(m.critical)],['Decisiones abiertas',String(m.pending.length)],['Riesgos prioritarios',String(m.activeRisks.length)],['Incidentes relevantes',String(m.openIncidents.length)]];
  const dec=m.pending.slice(0,3);
  return '<div class="command" data-contract="ATLAS-V4-Identity-1.0">'+
@@ -77,11 +89,10 @@ export function renderExecutiveCommand(s){
  kpis.map(([label,value],i)=>'<div class="command-kpi"><b>'+esc(value)+'</b><span>'+esc(label)+'</span><small>'+esc(i===0?'Calculado de registros':i===1?'Servicios de criticidad 1':i===2?'Pendientes':i===3?'Riesgos abiertos':'Incidentes sin resolver')+'</small></div>').join('')+'</section>'+
  '<section class="command-primary"><article class="command-map"><header class="command-map-head"><h2>Ecosistema tecnológico</h2><div class="command-lenses" role="group" aria-label="Perspectivas del ecosistema">'+
  lenses.map(x=>'<button type="button" data-command-lens="'+x+'" aria-pressed="'+(x===lens)+'" class="'+(x===lens?'on':'')+'">'+x+'</button>').join('')+'</div></header>'+
- '<div class="command-map-area" data-lens="'+esc(lens)+'"><svg class="command-connections" viewBox="0 0 1000 460" preserveAspectRatio="none" aria-hidden="true">'+
- [78,179,280,381].map(y=>'<path d="M 255 '+y+' C 392 '+y+', 387 230, 490 230" />').join('')+
- [78,179,280,381].map(y=>'<path d="M 745 '+y+' C 608 '+y+', 613 230, 510 230" />').join('')+
+ '<div class="command-map-area" data-lens="'+esc(lens)+'"><svg class="command-connections" viewBox="0 0 1000 460" preserveAspectRatio="none" aria-label="Vínculos conceptuales de los ocho dominios con Core">'+
+ m.domains.map((d,i)=>{const left=i<4,position=i%4,y=64+position*110;return '<path class="command-connection '+(d.status==='Seguimiento'?'is-watch ':'')+(selected===d.name?'is-selected':'')+'" data-domain-link="'+esc(d.name)+'" d="M '+(left?278:722)+' '+y+' C '+(left?398:602)+' '+y+', '+(left?386:614)+' 230, '+(left?490:510)+' 230" />'}).join('')+
  '</svg><div class="command-domain-column command-left">'+left.map(domainButton).join('')+'</div>'+
- '<button type="button" data-command-ui="core" class="command-core" aria-label="Abrir detalle de Core"><small>NÚCLEO TECNOLÓGICO</small><strong>Core</strong><span>'+esc(pct(m.availability))+' DISP.</span></button>'+
+ '<button type="button" data-command-ui="core" class="command-core" aria-label="Abrir detalle de Core"><span class="command-core-symbol">'+iconSvg('network')+'</span><strong>Core</strong><small>'+esc(pct(m.availability))+' DISPONIBILIDAD</small><span class="command-core-state">'+(m.availability===null?'SIN DATOS':'CON REGISTROS')+'</span></button>'+
  '<div class="command-domain-column command-right">'+right.map(domainButton).join('')+'</div></div>'+
  '<div class="command-map-foot"><span>● Con registros &nbsp; ● Seguimiento &nbsp; Perspectiva: <b>'+esc(lens)+'</b></span>'+
  '<button type="button" class="command-link" data-view="verticals">Explorar arquitectura →</button></div>'+
@@ -109,7 +120,7 @@ export function renderExecutiveCommand(s){
  '<section class="command-bottom"><article class="command-bottom-card"><h2>Pulso operativo</h2>'+
  (m.events.length?m.events.map(e=>'<div class="command-event"><time>'+esc(e.date||'—')+'</time><span>'+esc(e.text)+'</span></div>').join(''):
  '<p class="command-empty">Sin eventos registrados.</p>')+'</article>'+
- '<article class="command-bottom-card"><h2>Estado por dominio</h2><div class="command-domain-strip">'+m.domains.map(d=>'<button type="button" data-command-domain="'+esc(d.name)+'"><strong>'+esc(d.name)+'</strong><small>'+esc(d.status)+'</small></button>').join('')+'</div></article></section>'+
+ '<article class="command-bottom-card"><h2>Estado por dominio</h2><div class="command-domain-strip">'+m.domains.map(d=>'<button type="button" data-command-domain="'+esc(d.name)+'">'+iconSvg(d.icon)+'<strong>'+esc(d.name)+'</strong><small class="'+(d.status==='Seguimiento'?'is-watch':'')+'">'+esc(d.status)+'</small></button>').join('')+'</div></article></section>'+
  '<p class="command-disclaimer">ATLAS / Estado derivado exclusivamente de los registros disponibles. Las categorías sin información muestran Sin datos; no existen integraciones de monitoreo real.</p>'+
  '</div>';
 }
