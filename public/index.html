@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#f2f5f8">
+<meta name="theme-color" content="#0B2025">
 <meta name="description" content="ATLAS IT Governance: gestión real de verticales, capacity, assessments, riesgos, continuidad y acciones correctivas con trazabilidad.">
 <title>ATLAS · Gobierno y Operaciones de Tecnología</title>
 <link rel="stylesheet" href="./governance.css">
@@ -12,6 +12,7 @@
 <link rel="stylesheet" href="./incidents.css">
 <link rel="stylesheet" href="./itsm-mapping.css">
 <link rel="stylesheet" href="./remote-workspaces.css">
+<link rel="stylesheet" href="./atlas-v4-system.css">
 <script type="module" src="./governance.js"></script>
 </head>
 <body>
@@ -20,18 +21,19 @@
   <div class="brand"><div class="brand-symbol">A<span>.</span></div><div class="brand-word"><strong>ATLAS</strong><small>IT GOVERNANCE PLATFORM</small></div></div>
   <div class="workspace-label">WORKSPACE / DIRECCIÓN DE TI</div>
   <nav id="navigation" class="navigation" aria-label="Módulos de gestión">
-   <button type="button" class="nav-item selected" data-view="overview"><span class="nav-icon">▦</span> Visión ejecutiva</button>
+   <button type="button" class="nav-item selected" data-view="overview" aria-label="Inicio / centro de gobierno" title="Inicio / centro de gobierno"><span class="nav-icon">▦</span> Visión ejecutiva</button>
    <div class="nav-section">GESTIÓN DE OPERACIONES</div>
-   <button type="button" class="nav-item" data-view="performance"><span class="nav-icon">◎</span> KPI y OKR tecnológicos</button>
-   <button type="button" class="nav-item" data-view="incidents"><span class="nav-icon">▥</span> Incidentes y MTTR</button>
-   <button type="button" class="nav-item" data-view="verticals"><span class="nav-icon">◫</span> Verticales y equipos</button>
-   <button type="button" class="nav-item" data-view="capacity"><span class="nav-icon">◉</span> Capacity management</button>
-   <button type="button" class="nav-item" data-view="assessments"><span class="nav-icon">▤</span> Assessments</button>
+   <button type="button" class="nav-item" data-view="performance" aria-label="KPI y OKR tecnológicos" title="KPI y OKR tecnológicos"><span class="nav-icon">◎</span> KPI y OKR tecnológicos</button>
+   <button type="button" class="nav-item" data-view="incidents" aria-label="Incidentes y MTTR" title="Incidentes y MTTR"><span class="nav-icon">▥</span> Incidentes y MTTR</button>
+   <button type="button" class="nav-item" data-view="operations" aria-label="Análisis operativo detallado" title="Análisis operativo detallado"><span class="nav-icon">◈</span> Análisis operativo</button>
+   <button type="button" class="nav-item" data-view="verticals" aria-label="Verticales y equipos" title="Verticales y equipos"><span class="nav-icon">◫</span> Verticales y equipos</button>
+   <button type="button" class="nav-item" data-view="capacity" aria-label="Capacity management" title="Capacity management"><span class="nav-icon">◉</span> Capacity management</button>
+   <button type="button" class="nav-item" data-view="assessments" aria-label="Assessments" title="Assessments"><span class="nav-icon">▤</span> Assessments</button>
    <div class="nav-section">CONTROL Y GOBIERNO</div>
-   <button type="button" class="nav-item" data-view="risks"><span class="nav-icon">◇</span> Registro de riesgos</button>
-   <button type="button" class="nav-item" data-view="actions"><span class="nav-icon">☷</span> Planes de acción</button>
-   <button type="button" class="nav-item" data-view="continuity"><span class="nav-icon">↻</span> Continuidad y SLA</button>
-   <button type="button" class="nav-item" data-view="committee"><span class="nav-icon">◎</span> Comité de Tecnología</button>
+   <button type="button" class="nav-item" data-view="risks" aria-label="Registro de riesgos" title="Registro de riesgos"><span class="nav-icon">◇</span> Registro de riesgos</button>
+   <button type="button" class="nav-item" data-view="actions" aria-label="Planes de acción" title="Planes de acción"><span class="nav-icon">☷</span> Planes de acción</button>
+   <button type="button" class="nav-item" data-view="continuity" aria-label="Continuidad y SLA" title="Continuidad y SLA"><span class="nav-icon">↻</span> Continuidad y SLA</button>
+   <button type="button" class="nav-item" data-view="committee" aria-label="Comité de Tecnología" title="Comité de Tecnología"><span class="nav-icon">◎</span> Comité de Tecnología</button>
   </nav>
   <div class="sidebar-foot">
    <div class="storage-indicator"><span class="indicator"></span> DATOS LOCALES DEL NAVEGADOR</div>
