@@ -30,7 +30,7 @@ try{
     page.on('pageerror',e=>errors.push(e.message));
     const requests=[];
     const historical=createDemo();
-    let revision=role==='owner'?2:1, conflict=false, stored=createDemo();
+    let revision=role==='owner'?2:1, conflict=false, dropAck=false, stored=createDemo();
     if(role==='owner')stored.verticals.push({id:'v-owner-added',name:'Restaurar después',owner:'IT',description:'Prueba V5'});
     const tenant='org-demo',id='ws-demo';
     await page.route('**/api/v1/**',async route=>{
@@ -58,12 +58,15 @@ try{
         const received=req.postDataJSON();
         if(role==='viewer'){status=403;data={error:'Permiso insuficiente'};}
         else if(conflict||received.revision!==revision){status=409;data={error:'Conflicto de revisión'};}
-        else{stored=received.state;revision++;data={id,revision};}
+        else{
+          stored=received.state;revision++;data={id,revision};
+          if(dropAck){dropAck=false;await route.abort('failed');return;}
+        }
       }else{status=404;data={error:'Ruta inexistente'};}
       await route.fulfill({status,contentType:'application/json',body:JSON.stringify(data)});
     });
     await page.goto(base,{waitUntil:'networkidle'});
-    return {page,requests,flipConflict:()=>{conflict=true;},revision:()=>revision,stored:()=>stored};
+    return {page,requests,flipConflict:()=>{conflict=true;},loseAckOnce:()=>{dropAck=true;},revision:()=>revision,stored:()=>stored};
   }
 
   const editor=await setup();
@@ -95,12 +98,45 @@ try{
   await editor.page.getByText('CAMBIOS SIN CONFIRMAR').waitFor();
   assert.equal(editor.revision(),2,'No se pierden revisiones en conflicto');
   assert.ok(await editor.page.locator('[data-workspace-command="backup"]').isVisible());
+  const beforeVerify=editor.requests.filter(x=>x.method==='PUT').length;
+  await editor.page.locator('[data-workspace-command="verify"]').click();
+  await editor.page.getByText('CAMBIOS SIN CONFIRMAR').waitFor();
+  assert.equal(editor.requests.filter(x=>x.method==='PUT').length,beforeVerify,
+    'Verificar una revisión diferente no debe reintentar el PUT');
+  assert.ok((await editor.page.locator('#workspace-panel').innerText()).includes('versión diferente'));
   assert.equal(await editor.page.evaluate(()=>localStorage.getItem('atlas-governance-workspace-v1')),localData);
   editor.page.once('dialog',d=>d.accept());
   await editor.page.locator('[data-workspace-command="local"]').click();
   await editor.page.waitForFunction(()=>document.querySelector('#workspace-panel')?.textContent?.includes('V4 local'));
   assert.equal(await editor.page.evaluate(()=>localStorage.getItem('atlas-governance-workspace-v1')),localData);
   await editor.page.close();
+
+  // Un corte de red puede perder la respuesta DESPUÉS de que D1 ya guardó el PUT.
+  // La reconciliación debe confirmar por GET, sin repetir escritura ni perder cambios.
+  const uncertain=await setup('editor');
+  await uncertain.page.locator('[data-workspace-command="connect"]').click();
+  await uncertain.page.locator('[data-workspace-command="open"]').waitFor();
+  await uncertain.page.locator('[data-workspace-command="open"]').click();
+  await uncertain.page.getByText('Compartido: Gobierno Compartido').waitFor();
+  const uncertainLocal=await uncertain.page.evaluate(()=>localStorage.getItem('atlas-governance-workspace-v1'));
+  uncertain.loseAckOnce();
+  await uncertain.page.locator('[data-view="verticals"]').click();
+  await uncertain.page.locator('[data-open="vertical"]').first().click();
+  await uncertain.page.locator('#field-name').fill('Operación guardada sin confirmación');
+  await uncertain.page.locator('#field-owner').fill('Sistemas');
+  await uncertain.page.locator('#dialog-submit').click();
+  await uncertain.page.getByText('CAMBIOS SIN CONFIRMAR').waitFor();
+  assert.equal(uncertain.revision(),2,'El servidor persistió aunque se perdió la respuesta');
+  assert.equal(uncertain.requests.filter(x=>x.method==='PUT').length,1);
+  assert.ok(await uncertain.page.locator('[data-workspace-command="verify"]').isVisible());
+  await uncertain.page.locator('[data-workspace-command="verify"]').click();
+  await uncertain.page.waitForFunction(()=>document.querySelector('#workspace-panel')?.textContent?.includes('r2'));
+  assert.equal(uncertain.requests.filter(x=>x.method==='PUT').length,1,
+    'Verificar resultado no repite un PUT previamente confirmado en la base');
+  assert.equal(await uncertain.page.locator('[data-workspace-command="backup"]').count(),0);
+  assert.ok(uncertain.stored().verticals.some(x=>x.name==='Operación guardada sin confirmación'));
+  assert.equal(await uncertain.page.evaluate(()=>localStorage.getItem('atlas-governance-workspace-v1')),uncertainLocal);
+  await uncertain.page.close();
 
   const viewer=await setup('viewer');
   await viewer.page.locator('[data-workspace-command="connect"]').click();
@@ -133,7 +169,7 @@ try{
   await owner.page.close();
 
   assert.deepEqual(errors,[]);
-  console.log('OK V5: local intacto; sesión y workspace; escritura r2; conflicto 409; reversión local; viewer sin edición; historial y restauración owner r3.');
+  console.log('OK V5: local intacto; sesión y workspace; HTTP 409; respuesta perdida reconciliada por GET sin PUT duplicado; viewer sin edición; recuperación owner r3.');
 }finally{
   await browser?.close();
   await new Promise(resolve=>server.close(resolve));
