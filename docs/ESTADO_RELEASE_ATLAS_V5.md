@@ -37,3 +37,11 @@ Las pruebas locales no equivalen a producción. No declarar RPO/RTO, autenticaci
 **Control de Preview V5:** Cloudflare auto_build está apagado solamente para esta rama hasta autorizar y configurar una Preview real. GitHub Actions sigue ejecutándose.
 
 **Bloqueos de versión definitiva:** costos aceptados; identidades Access; persistencia D1; recuperación real; pruebas funcionales y aprobación final. Sin esos hitos solo puede declararse una versión candidata, nunca una V5 definitiva.
+
+## Control adicional — 19/11/2026 (lectura Cloudflare y gate)
+
+- GitHub PR #8 sigue en borrador, V4 en `main`; no se efectuó merge.
+- Sólo se consultaron por GET las listas de D1 y Workers, obteniendo una D1 y cuatro Workers existentes, ninguno de ellos V5.
+- Las consultas de suscripción, facturación y Access continúan bloqueadas por **HTTP 403**; no se puede afirmar que Access esté habilitado ni que el costo real sea USD 0.
+- Se introdujo `scripts/v5-release-readiness.mjs`, una compuerta de evaluación local que **no realiza acciones remotas** y exige confirmación explícita de plan Free, cuotas, recuperación, identidad, pruebas reales y autorización final. Campos ausentes o valores distintos de `true` bloquean el resultado.
+- Este cambio **no habilita despliegue**. El siguiente paso externo requiere permisos de lectura adecuados o verificación humana del panel, seguida de autorización inequívoca antes de crear cualquier recurso.
