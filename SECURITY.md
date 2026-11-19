@@ -32,6 +32,8 @@ La futura incorporación de Cloudflare D1 deberá ir precedida de autenticación
 
 La rama `feature/atlas-v5-multiusuario-gobierno` añade validación criptográfica de JWT de Cloudflare Access en el Worker, segregación por `tenant_id`, RBAC verificado por servidor, control de revisión y auditoría de operaciones de workspace/membresía. Las solicitudes de escritura requieren encabezado anti-CSRF y verificación de origen; los cuerpos JSON se limitan mientras se reciben a 1 MiB por operación. Las restauraciones requieren rol `owner` o `admin`, generan revisión nueva y se auditan. La UI remota es opt-in, y V4 conserva su modo local sin solicitar sesiones por defecto. No se han habilitado aún Cloudflare Access, la base D1 ni el Worker V5.
 
+Las escrituras verifican además evidencias y reglas de cierre **en el servidor**; tras finalizar acciones, riesgos, decisiones u objetivos, una edición ordinaria no puede reescribirlos. Se impide también alterar o eliminar incidentes previamente registrados desde un guardado de snapshot. No hay aprobación multiusuario independiente: un editor sigue pudiendo declarar evidencia propia. La restauración histórica por `owner`/`admin` constituye una excepción explícita y auditada.
+
 **Esta implementación todavía no está aprobada para información real.** Las pruebas de seguridad y de usuario utilizan datos sintéticos y un backend simulado; deben completarse pruebas integradas de identidad y D1, procedimientos de backup/restauración, retención y eliminación, monitoreo de consumo y revisión de autorización antes de ponerla en producción. La auditoría de D1 no es un repositorio WORM ni prueba por sí sola cumplimiento regulatorio. No se registran tokens ni datos de workspaces en los eventos de auditoría.
 
 ## Reportes
