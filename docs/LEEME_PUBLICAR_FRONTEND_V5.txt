@@ -1,0 +1,24 @@
+ATLAS V5 — PUBLICACIÓN DEL FRONTEND EN EL WORKER EXISTENTE
+
+Este paquete contiene la interfaz V5 con el diseño aprobado de V4 y las
+funciones locales de gobierno. NO dispone de backend multiusuario real
+ni autenticación Cloudflare Access configurada.
+
+ATENCIÓN: publicar reemplaza la interfaz V4 visible en la URL actual.
+Mantener un punto de restauración en el historial de despliegues Cloudflare.
+
+PASOS DESDE UNA COMPUTADORA CON NODE.JS:
+1. Confirmar en Cloudflare que el plan, el uso y los límites permiten operar
+   con costo efectivo USD 0. La cuenta no permitió verificar facturación por API.
+2. Descargar y descomprimir el paquete completo.
+3. Abrir una terminal dentro de la carpeta que contiene dist y wrangler.atlas-public.jsonc.
+4. Ejecutar: npx wrangler login
+5. Ejecutar: npx wrangler deploy --config wrangler.atlas-public.jsonc
+6. Abrir la URL habitual del Worker y comprobar el título "Visibilidad para decidir.".
+7. Comprobar en vista móvil que Core aparece encima de los dominios.
+8. Si ocurre un error, restaurar la versión anterior desde Cloudflare
+   Workers > Deployments. No reutilizar bases de datos existentes.
+
+LÍMITES: no se activan D1 ni Access, y la colaboración remota de V5 no
+queda disponible. El sitio muestra información local o de demostración;
+no se deben cargar datos confidenciales.
