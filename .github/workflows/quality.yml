@@ -17,6 +17,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: "V5: control obligatorio de arquitectura 100% Free"
+        run: node scripts/v5-zero-cost-gate.mjs
       - name: "V5: preflight de secretos, despliegues y recuperación"
         run: node scripts/v5-release-preflight.mjs
       - name: Verificación de sintaxis

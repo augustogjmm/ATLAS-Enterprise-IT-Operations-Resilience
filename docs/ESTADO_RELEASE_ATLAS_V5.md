@@ -3,6 +3,13 @@
 **Control:** 19/11/2026. **Rama:** feature/atlas-v5-multiusuario-gobierno; PR #8.
 Este documento no autoriza despliegue ni cambios de infraestructura.
 
+**Condición irrevocable del proyecto:** costo monetario **USD 0**, sin plan Workers Paid,
+suscripciones, dominios pagos ni recursos con cobro por uso. Solo se autoriza la
+arquitectura conservadora de [costo cero](COSTO_CERO_ATLAS_V5.md); si una cuota se
+agota, el servicio debe limitar operaciones, **nunca solicitar ni activar un upgrade**.
+La verificación del plan real de Cloudflare está **bloqueada por permisos API 403**,
+de modo que V5 debe permanecer sin publicar hasta comprobarlo por una vía autorizada.
+
 ## Acceso al producto
 
 - **V4 publicada:** https://atlas-enterprise-it-operations-resilience.augusto-garciajm.workers.dev/ — datos demostrativos almacenados en el navegador.
@@ -13,7 +20,7 @@ Este documento no autoriza despliegue ni cambios de infraestructura.
 | Puerta | Criterio de salida | Estado |
 |---|---|---|
 | 1. Candidato local | Pruebas Node, Chromium V4/V5, RBAC, JWT firmado, D1 local, concurrencia, respaldo y restauración sin errores | **En cierre** |
-| 2. Identidad y datos remotos | Autorización expresa de costos, Worker V5 y D1 aislados, Access deny-by-default, migraciones, tenant y owner sintéticos | **Pendiente de autorización** |
+| 2. Identidad y datos remotos | Comprobar plan Workers Free y Zero Trust Free, **costo cero y cuotas disponibles**; Worker V5 y D1 aislados, Access deny-by-default, migraciones y cuentas sintéticas | **Bloqueada hasta verificar plan gratuito; sin activación** |
 | 3. Homologación | Dos cuentas Access reales, permisos, revocaciones, revisión 409, restauración completa de D1, medición de límites y monitoreo | **Pendiente del entorno real** |
 | 4. Publicación | Pruebas de aceptación funcional, controles de seguridad y accesibilidad, go/no-go, URL V5 documentada y rollback | **No iniciada** |
 

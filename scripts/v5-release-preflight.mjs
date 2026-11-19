@@ -33,6 +33,8 @@ for(const file of workflows){
 }
 for(const path of ['migrations/0001_atlas_v5.sql','migrations/0002_atlas_v5_history.sql',
   'docs/RUNBOOK_OPERACION_RECUPERACION_V5.md','worker/auth.js',
-  'tests/v5-signed-access-api.test.js','scripts/v5-multiuser-smoke.mjs'])
+  'tests/v5-signed-access-api.test.js','scripts/v5-multiuser-smoke.mjs',
+  'scripts/v5-zero-cost-gate.mjs','tests/v5-zero-cost-gate.test.js',
+  'docs/COSTO_CERO_ATLAS_V5.md'])
   assert.equal(existsSync(path),true,'Falta control de migración, recuperación o pruebas: '+path);
 console.log('OK ATLAS V5 preflight: sin secretos versionados, sin despliegues automáticos, migraciones/rollback y pruebas de JWT presentes.');

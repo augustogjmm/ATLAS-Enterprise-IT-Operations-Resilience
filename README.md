@@ -11,6 +11,8 @@
 - **V4 publicada:** [Abrir ATLAS Governance](https://atlas-enterprise-it-operations-resilience.augusto-garciajm.workers.dev/). No requiere usuario y conserva los datos en el navegador; utilizar solo información ficticia.
 - **V5 multiusuario:** [seguir el PR #8](https://github.com/augustogjmm/ATLAS-Enterprise-IT-Operations-Resilience/pull/8). Todavía **no existe una URL pública ni un entorno de acceso real**; requiere autorización para provisionar Access, D1 y un Worker independiente.
 
+**Política no negociable:** ATLAS V5 debe funcionar exclusivamente con servicios de costo USD 0, sin upgrades ni facturación por consumo. La plantilla está protegida por una [puerta automática de costo cero](docs/COSTO_CERO_ATLAS_V5.md) en GitHub Actions; **no se desplegará V5 hasta verificar que el plan real de la cuenta es gratuito**. Si se agotan cuotas, se acepta una interrupción controlada, no una compra.
+
 ## ATLAS V5 — Evolución multiusuario en desarrollo (PR #8)
 
 > **Esta rama no es la versión publicada.** La V4 de `main` continúa pública y exclusivamente local. V5 no ha creado D1, habilitado Cloudflare Access ni activado servicios de pago.
