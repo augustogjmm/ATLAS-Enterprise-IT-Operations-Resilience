@@ -40,6 +40,7 @@ export function executiveModel(s){
  const duration=valid.reduce((n,x)=>n+Number(x.periodMinutes),0);
  const availabilityTotal=duration?100*valid.reduce((n,x)=>n+Number(x.periodMinutes)-Number(x.downtimeMinutes),0)/duration:null;
  const activeRisks=risks.filter(x=>x.status==='abierto');
+ const priorityRisks=activeRisks.filter(x=>severity(x).score>=9); // Alto o Crítico; exclusión explícita de Medio/Bajo.
  const pending=decisions.filter(x=>x.status==='pendiente');
  const openIncidents=incidents.filter(x=>x.resolvedAt===null||x.resolvedAt===undefined);
  const domains=ATLAS_DOMAINS.map(([name,icon,match,route])=>{
@@ -56,7 +57,7 @@ export function executiveModel(s){
      availability:a.length?a.reduce((n,x)=>n+x,0)/a.length:null,utilization:used.length?used.reduce((n,x)=>n+x,0)/used.length:null,
      risk,status:alert?'Seguimiento':(ownerVerticals.length||associatedServices.length||associatedCapacity.length)?'Con registros':'Sin datos'};
  });
- return {domains,availability:availabilityTotal,critical:critical.length,pending,activeRisks,openIncidents,
+ return {domains,availability:availabilityTotal,critical:critical.length,pending,activeRisks,priorityRisks,openIncidents,
    decisions,events:(s.events||[]).slice(-4).reverse(),isDemo,hasRecords:vs.length+services.length+risks.length+decisions.length>0};
 }
 function domainSub(d){
@@ -78,7 +79,7 @@ export function renderExecutiveCommand(s){
  const m=executiveModel(s);const left=m.domains.slice(0,4),right=m.domains.slice(4);
  const domainButton=d=>'<button type="button" class="command-domain '+(d.status==='Seguimiento'?'is-watch ':'')+(selected===d.name?'is-selected':'')+
   '" data-command-domain="'+esc(d.name)+'" aria-pressed="'+(selected===d.name)+'"><span class="command-domain-icon">'+iconSvg(d.icon)+'</span><span class="command-domain-copy"><strong>'+esc(d.name)+'</strong><small>'+esc(domainSub(d))+'</small><span class="command-domain-state">'+esc(d.status)+'</span></span></button>';
- const kpis=[['Disponibilidad',pct(m.availability)],['Componentes críticos',String(m.critical)],['Decisiones abiertas',String(m.pending.length)],['Riesgos prioritarios',String(m.activeRisks.length)],['Incidentes relevantes',String(m.openIncidents.length)]];
+ const kpis=[['Disponibilidad',pct(m.availability)],['Componentes críticos',String(m.critical)],['Decisiones abiertas',String(m.pending.length)],['Riesgos prioritarios',String(m.priorityRisks.length)],['Incidentes relevantes',String(m.openIncidents.length)]];
  const dec=m.pending.slice(0,3);
  return '<div class="command" data-contract="ATLAS-V4-Identity-1.0">'+
  '<section class="command-hero"><div><span class="command-eyebrow">CENTRO DE GOBIERNO TECNOLÓGICO / 01</span><h1>Visibilidad para decidir<span>.</span></h1>'+
@@ -86,7 +87,7 @@ export function renderExecutiveCommand(s){
  '<button type="button" class="command-quiet" data-view="committee">Vista comité ↗</button></section>'+
  '<div class="command-data-label">'+(m.isDemo?'DATOS DEMOSTRATIVOS O EDITADOS · NO ES MONITOREO EN TIEMPO REAL':'REGISTROS DEL WORKSPACE · SIN MONITOREO EN TIEMPO REAL')+'</div>'+
  '<section class="command-kpis" aria-label="Indicadores ejecutivos"><div class="command-kpi-intro"><small>LECTURA EJECUTIVA</small><em>La operación, hoy.</em></div>'+
- kpis.map(([label,value],i)=>'<div class="command-kpi"><b>'+esc(value)+'</b><span>'+esc(label)+'</span><small>'+esc(i===0?'Calculado de registros':i===1?'Servicios de criticidad 1':i===2?'Pendientes':i===3?'Riesgos abiertos':'Incidentes sin resolver')+'</small></div>').join('')+'</section>'+
+ kpis.map(([label,value],i)=>'<div class="command-kpi"><b>'+esc(value)+'</b><span>'+esc(label)+'</span><small>'+esc(i===0?'Calculado de registros':i===1?'Servicios de criticidad 1':i===2?'Pendientes':i===3?'Riesgos altos/críticos':'Incidentes sin resolver')+'</small></div>').join('')+'</section>'+
  '<section class="command-primary"><article class="command-map"><header class="command-map-head"><h2>Ecosistema tecnológico</h2><div class="command-lenses" role="group" aria-label="Perspectivas del ecosistema">'+
  lenses.map(x=>'<button type="button" data-command-lens="'+x+'" aria-pressed="'+(x===lens)+'" class="'+(x===lens?'on':'')+'">'+x+'</button>').join('')+'</div></header>'+
  '<div class="command-map-area" data-lens="'+esc(lens)+'"><svg class="command-connections" viewBox="0 0 1000 460" preserveAspectRatio="none" aria-label="Vínculos conceptuales de los ocho dominios con Core">'+
