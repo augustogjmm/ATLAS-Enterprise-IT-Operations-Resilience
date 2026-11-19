@@ -67,7 +67,8 @@ export function mountAtlasShell({getState,getWorkspace,navigate}){
   if(event.target.dataset.shellClose!==undefined)alerts.close();
  });
  document.getElementById('atlas-profile-open').addEventListener('click',()=>{
-  update();document.getElementById('workspace-panel')?.scrollIntoView({behavior:'smooth',block:'start'});
+  update();document.getElementById('workspace-tools').open=true;
+  document.getElementById('workspace-panel')?.scrollIntoView({behavior:'smooth',block:'start'});
  });
  update();return {update};
 }
