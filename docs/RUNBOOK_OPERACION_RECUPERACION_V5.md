@@ -126,3 +126,16 @@ En un workspace remoto, un miembro con rol `owner`, `admin` o `auditor` puede se
 El JSON contiene `tenantId`, fecha de exportación, conteo, advertencia sobre concurrencia y lista de eventos. **Contiene correos de usuarios**, por lo que debe almacenarse de forma privada. Verificar el conteo y calcular/verificar un hash SHA-256 del archivo al archivarlo. El archivo descargado **no es un backup de D1** ni una auditoría WORM. Al ser una lectura paginada, no garantiza consistencia transaccional frente a altas simultáneas: para un cierre de evidencia, suspender escrituras y comparar el conteo con la base antes y después.
 
 La UI no borra ni rota registros; si se alcanza el máximo global de 2.000, las escrituras permanecen bloqueadas. La política de archivo, recuperación de evidencia y desbloqueo exige un procedimiento administrativo aprobado, todavía pendiente. No utilizar datos reales en esta demo sin completar homologación.
+
+
+### Integridad comprobable del archivo exportado
+
+Cada respuesta paginada informa el conteo de eventos de su organización. El cliente exige que el conteo permanezca estable entre páginas y que el total recuperado coincida antes de generar la descarga; si detecta altas concurrentes o una respuesta truncada, **no descarga** el archivo. Este control no sustituye una transacción D1 de lectura ni protege contra alteraciones de eventos ya existentes por un administrador de base de datos.
+
+El archivo contiene `integrity.algorithm=SHA-256`, `integrity.encoding=JSON.stringify(events)` e `integrity.sha256`. La huella cubre exclusivamente `events`; no cubre `tenantId`, `exportedAt` ni otros metadatos del envoltorio. Para verificar el archivo **sin transmitir datos a terceros**, ejecutar:
+
+```sh
+node scripts/v5-verify-audit-export.mjs atlas-v5-auditoria-org-demo-AAAA-MM-DD.json
+```
+
+El verificador rechaza alteraciones de eventos, conteos inconsistentes y IDs duplicados. Para custodia formal, almacenar aparte un hash SHA-256 **del archivo completo**, el contexto de exportación y controles independientes de acceso. Una huella incorporada en el mismo archivo no demuestra autenticidad frente a un atacante capaz de modificar ambos elementos. La V5 sigue en etapa demostrativa, sin retención WORM ni garantía de evidencia regulatoria.
