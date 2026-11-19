@@ -74,6 +74,7 @@ try{
       await route.fulfill({status,contentType:'application/json',body:JSON.stringify(data)});
     });
     await page.goto(base,{waitUntil:'networkidle'});
+    await page.locator('#workspace-tools').evaluate(el=>el.open=true);
     return {page,requests,flipConflict:()=>{conflict=true;},loseAckOnce:()=>{dropAck=true;},revision:()=>revision,stored:()=>stored};
   }
 
@@ -169,9 +170,11 @@ try{
   assert.equal(await owner.page.locator('.command-domain').count(),8);
   assert.equal(await owner.page.locator('.command-lenses button').count(),5);
   await mkdir('test-artifacts',{recursive:true});
+  await owner.page.locator('#workspace-tools').evaluate(el=>el.open=false);
   await owner.page.screenshot({path:'test-artifacts/v5-command-1700.png',fullPage:true});
   await owner.page.setViewportSize({width:430,height:1600});
   await owner.page.screenshot({path:'test-artifacts/v5-command-430.png',fullPage:true});
+  await owner.page.locator('#workspace-tools').evaluate(el=>el.open=true);
   const mobileOverflow=await owner.page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1);
   assert.equal(mobileOverflow,false,'El command V5 no admite desbordamiento horizontal a 430 px');
   await owner.page.locator('[data-command-lens="Capacidad"]').click();
