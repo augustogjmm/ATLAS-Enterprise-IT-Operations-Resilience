@@ -169,6 +169,9 @@ try{
   await owner.page.locator('.command-hero h1').getByText('Visibilidad para decidir.').waitFor();
   assert.equal(await owner.page.locator('.command-domain').count(),8);
   assert.equal(await owner.page.locator('.command-lenses button').count(),5);
+  assert.equal(await owner.page.locator('.command-connections path').count(),8);
+  const desktopOverflow=await owner.page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1);
+  assert.equal(desktopOverflow,false,'No debe existir desbordamiento horizontal a 1700 px');
   await mkdir('test-artifacts',{recursive:true});
   await owner.page.locator('#workspace-tools').evaluate(el=>el.open=false);
   await owner.page.waitForTimeout(4500); // Captura sin toast transitorio del flujo de apertura.
@@ -190,12 +193,20 @@ try{
   assert.equal(mobileOverflow,false,'El command V5 no admite desbordamiento horizontal a 430 px');
   await owner.page.locator('[data-command-lens="Capacidad"]').click();
   assert.equal(await owner.page.locator('[data-command-lens="Capacidad"]').getAttribute('aria-pressed'),'true');
+  assert.equal(await owner.page.evaluate(()=>document.activeElement?.dataset?.commandLens),'Capacidad',
+    'El cambio de perspectiva preserva el foco del teclado');
   await owner.page.locator('[data-command-domain="Infraestructura"]').first().click();
   await owner.page.locator('.command-inspector h3').getByText('Infraestructura').waitFor();
   await owner.page.locator('[data-command-ui="close"]').click();
   await owner.page.locator('[data-command-ui="core"]').click();
   await owner.page.locator('.command-inspector h3').getByText('Core').waitFor();
   await owner.page.locator('[data-command-ui="close"]').click();
+  if(await owner.page.locator('[data-command-decision]').count()){
+    await owner.page.locator('[data-command-decision]').first().click();
+    await owner.page.locator('.command-decision-detail').waitFor({state:'visible'});
+    assert.ok((await owner.page.locator('.command-decision-detail').innerText()).includes('Responsable'));
+    await owner.page.locator('.command-decision-detail [data-command-ui="close"]').click();
+  }
   await owner.page.locator('.command-quiet').click();
   assert.equal(await owner.page.locator('[data-view="overview"]').count()>0,true);
   assert.equal(await owner.page.locator('#view-title').innerText(),'Comité de Tecnología');
