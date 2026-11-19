@@ -1,7 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {makeEmpty,createDemo} from '../src/governance/core.js';
-import {ATLAS_DOMAINS,executiveModel,renderExecutiveCommand} from '../public/executive-command.js';
+import {readFileSync} from 'node:fs';
+import {resolve} from 'node:path';
+import {pathToFileURL} from 'node:url';
+// El frontend importa desde dist/lib tras build; en Node la fuente es src/.
+const source=readFileSync(resolve('public/executive-command.js'),'utf8');
+const coreUrl=pathToFileURL(resolve('src/governance/core.js')).href;
+const adapted=source.replace("'./lib/governance/core.js'",JSON.stringify(coreUrl));
+const {ATLAS_DOMAINS,executiveModel,renderExecutiveCommand}=await import('data:text/javascript;base64,'+Buffer.from(adapted).toString('base64'));
 
 test('Contrato V4: 8 dominios, 5 perspectivas y título exacto',()=>{
  const html=renderExecutiveCommand(makeEmpty());
