@@ -105,6 +105,8 @@ Referencias oficiales:
 
 **Punto de avance actual:** API, esquema SQL, autenticación firmada, autorización RBAC, aislamiento de organizaciones, interfaz opt-in V5 y pruebas automatizadas de navegador **implementadas en la rama de desarrollo**. CI validó **70 pruebas de Node y dos suites V4 más una suite V5 de Chromium**. Pendiente: activar Access, crear y provisionar D1 (previa autorización), probar endpoints sobre recursos Cloudflare reales, revisión de seguridad y despliegue independiente. La V4 pública no se modificó.
 
+**Validaciones incrementales:** los guardados remotos requieren evidencia para acciones completadas, riesgos validados, decisiones resueltas y objetivos cerrados; el servidor rechaza intentos de alterar o eliminar registros ya finalizados o cambiar el origen de un incidente (HTTP 422). Esta política evita la omisión directa de validaciones visuales, aunque no sustituye una aprobación independiente formal. La suite ejecuta ahora `scripts/v5-multiuser-smoke.mjs`: **Worker real + SQLite local + varios contextos Chromium**, con identidades ficticias y pruebas de concurrencia/revocación. Ver [runbook operativo](RUNBOOK_OPERACION_RECUPERACION_V5.md).
+
 ### 7. Comportamiento de la interfaz opt-in
 
 - La pantalla pública se abre en **V4 local**, sin solicitudes a `/api/v1` en el arranque.
