@@ -155,7 +155,8 @@ export function mountRemoteV5({getState,getLocal,replaceState,notice,validateSta
       }
       if(command==='reload'){
         if(!active())return;
-        if(s.conflict&&!confirm('Los cambios locales todavía no están guardados. Exportá JSON antes de descartarlos. ¿Recargar?'))return;
+        // La confirmación sobre cambios sin guardar se realiza una sola vez en «open».
+        // Doble confirm() bloqueaba la recuperación tras un 409.
         s.choice=s.id;await act('open');return;
       }
       if(command==='history'&&active()&&canAudit(s.role)){
