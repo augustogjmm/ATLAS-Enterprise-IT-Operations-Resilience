@@ -250,6 +250,14 @@ export function mountRemoteV5({getState,getLocal,replaceState,notice,validateSta
       notice(s.error,true);
     }finally{s.busy=false;render();}
   }
+  // Advertir antes de cerrar/refrescar una pestaña con un guardado remoto incierto.
+  // No persiste datos sensibles silenciosamente en sessionStorage/localStorage.
+  window.addEventListener('beforeunload',event=>{
+    if(active()&&(s.conflict||s.busy)){
+      event.preventDefault();
+      event.returnValue='';
+    }
+  });
   document.addEventListener('click',event=>{
     const item=event.target.closest('[data-workspace-command]');
     if(item){event.preventDefault();void act(item.dataset.workspaceCommand);}
