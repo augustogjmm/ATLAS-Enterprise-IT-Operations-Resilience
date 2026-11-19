@@ -19,7 +19,7 @@ de modo que V5 debe permanecer sin publicar hasta comprobarlo por una vía autor
 
 | Puerta | Criterio de salida | Estado |
 |---|---|---|
-| 1. Candidato local | Pruebas Node, Chromium V4/V5, RBAC, JWT firmado, D1 local, concurrencia, respaldo y restauración; cuotas de demo 20 workspaces globales y 10 miembros activos por organización | **En cierre** |
+| 1. Candidato local | Pruebas Node, Chromium V4/V5, RBAC, JWT firmado, D1 local, concurrencia y recuperación; topes de 20 workspaces, 10 miembros activos por organización y 2.000 eventos globales de auditoría | **En cierre** |
 | 2. Identidad y datos remotos | Comprobar plan Workers Free y Zero Trust Free, **costo cero y cuotas disponibles**; Worker V5 y D1 aislados, Access deny-by-default, migraciones y cuentas sintéticas | **Bloqueada hasta verificar plan gratuito; sin activación** |
 | 3. Homologación | Dos cuentas Access reales, permisos, revocaciones, revisión 409, restauración completa de D1, medición de límites y monitoreo | **Pendiente del entorno real** |
 | 4. Publicación | Pruebas de aceptación funcional, controles de seguridad y accesibilidad, go/no-go, URL V5 documentada y rollback | **No iniciada** |

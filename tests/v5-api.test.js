@@ -553,3 +553,47 @@ test('costo cero: máximo 10 miembros activos; revocación permite nueva invitac
     {role:'editor',status:'active'});
   assert.equal(refusedAgain.status,429,'Una reactivación también respeta la cuota');
 });
+
+test('costo cero: auditoría global se satura en 2000 eventos y congela todas las escrituras',async()=>{
+  const {call,sqlite}=fixture();
+  const root='/api/v1/tenants/org-a/workspaces';
+  const created=await call('owner@a.test','POST',root,{name:'Historial completo',state:makeEmpty()});
+  assert.equal(created.status,201);
+  const id=created.body.id,path=root+'/'+id;
+  const stamp='2026-11-19T00:00:00Z';
+  const insert=sqlite.prepare(
+    "INSERT INTO atlas_audit_events(id,tenant_id,actor_email,action,metadata_json,occurred_at) "+
+    "VALUES(?,'org-a','owner@a.test','seed.synthetic','{}',?)"
+  );
+  // Un evento de creación ya existe; dejar una última plaza.
+  for(let n=0;n<1998;n++)insert.run('audit-'+n,stamp);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM atlas_audit_events').get().n,1999);
+  const changed=makeEmpty();
+  changed.verticals.push({id:'v1',name:'Operaciones',owner:'IT',description:''});
+  const last=await call('editor@a.test','PUT',path,{revision:1,state:changed});
+  assert.equal(last.status,200,JSON.stringify(last.body));
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM atlas_audit_events').get().n,2000);
+  const attempts=[
+    await call('owner@a.test','POST',root,{name:'Bloqueado',state:makeEmpty()}),
+    await call('editor@a.test','PUT',path,{revision:2,state:makeEmpty()}),
+    await call('owner@a.test','PUT',path+'/revisions/1/restore',{revision:2}),
+    await call('owner@a.test','PUT','/api/v1/tenants/org-a/members/extra-audit@a.test',
+      {role:'viewer',status:'active'})
+  ];
+  for(const item of attempts){
+    assert.equal(item.status,429,JSON.stringify(item.body));
+    assert.match(item.body.error,/límite global de 2000 eventos de auditoría/i);
+  }
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM atlas_audit_events').get().n,2000);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM atlas_workspaces').get().n,1);
+  assert.equal(sqlite.prepare('SELECT revision FROM atlas_workspaces WHERE id=?').get(id).revision,2);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM atlas_workspace_revisions WHERE workspace_id=?')
+    .get(id).n,2);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM atlas_memberships WHERE email=?')
+    .get('extra-audit@a.test').n,0);
+  const readable=await call('viewer@a.test','GET',path);
+  assert.equal(readable.status,200,'Las lecturas no deben depender de la cuota de auditoría');
+  assert.equal(readable.body.revision,2);
+  const logs=await call('auditor@a.test','GET','/api/v1/tenants/org-a/audit');
+  assert.equal(logs.status,200,'La bitácora debe permanecer consultable al saturarse');
+});
