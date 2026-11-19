@@ -1,110 +1,120 @@
-# ATLAS — IT Governance & Operations Management
+# ATLAS
+### Technology Governance · IT Operations · Executive Decision Intelligence
 
-### Gobierno de Tecnología: KPI, OKR, incidentes ITSM, capacity, riesgos y continuidad
+**De la complejidad tecnológica a decisiones con responsables, prioridades y evidencia.**
 
-**ATLAS** es un proyecto personal demostrativo para roles de Head of IT, Gerencia de Infraestructura, Operaciones Tecnológicas y Arquitectura Empresarial. El propósito es mostrar cómo se organiza el **gobierno de tecnología basado en registros, responsables, prioridades y evidencias**, no solamente indicadores visuales.
+ATLAS es una aplicación demostrativa de gobierno y operaciones de tecnología. Conecta registros de infraestructura, continuidad, capacidad, incidentes, riesgos, planes de acción y objetivos para responder una pregunta de dirección: **¿qué necesita atención, por qué importa y quién debe actuar?**
 
-> **Versión funcional V4:** plataforma estática, con operaciones reales sobre datos almacenados en **el navegador del usuario**. El contenido de inicio es 100% ficticio, identificado como demostración. No monitorea infraestructura ni conecta servicios productivos. No utiliza todavía D1 ni autenticación multiusuario.
+El proyecto muestra tanto una visión ejecutiva como los mecanismos que la sostienen: datos estructurados, reglas de negocio verificables, trazabilidad entre entidades y pruebas automatizadas.
 
-## ¿Qué podés hacer?
+**[Abrir la demostración pública](https://atlas-enterprise-it-operations-resilience.augusto-garciajm.workers.dev/)** · **[Explorar el recorrido funcional](docs/DEMO_GUIDE.md)** · **[Ver evolución V5 (PR #8)](https://github.com/augustogjmm/ATLAS-Enterprise-IT-Operations-Resilience/pull/8)**
 
-| Área | Operaciones disponibles |
-|---|---|
-| **Incidentes ITSM** | Importar CSV con validación, deduplicación y cierres; calcular MTTR, P1/P2, pendientes, históricos mensuales y métricas por servicio, procesados localmente. |
-| **KPI / OKR** | Definir indicadores y objetivos con responsables y metas, vincular KR con KPI, calcular avances desde registros, registrar cierre con evidencia y congelar valores al cerrar. |\n| **Verticales y equipos** | Registrar unidades de gestión con responsables y ámbitos, comparar madurez y exposición. |
-| **Capacity tecnológico** | Registrar consumo/total por recurso, umbrales y tasa de crecimiento; calcular utilización y proyección a tres meses. Una medición sobre el umbral genera un riesgo vinculado. |
-| **Capacity de equipos** | Registrar FTE disponibles/asignados, cobertura operativa, brechas de reemplazo o habilidades. Sobrecarga o cobertura baja dispara un riesgo. No se evalúa desempeño individual. |
-| **Assessments** | Registrar dimensiones, puntuación 1 a 5, hallazgos, responsables y evidencia. Calificación 1 o 2 crea un riesgo automáticamente. |
-| **Riesgos** | Registrar probabilidad, impacto y exposición; identificar riesgos sin plan y vincularlos con assessments, capacidades o servicios. |
-| **Planes de acción** | Asignar compromisos a riesgos, responsable, fecha objetivo y evidencia. Solo permite completar una acción con evidencia y validar mitigación después de cerrar todas las acciones vinculadas. |
-| **Continuidad / disponibilidad** | Administrar servicios, criticidad, objetivo SLA, minutos observados de caída, resultado y evidencia de ejercicios DR, objetivos RTO/RPO. |
-| **Comité de Tecnología** | Registrar decisiones, responsables, fecha, riesgo asociado y constancia de resolución. |
-| **Centro ejecutivo** | Calcular automáticamente riesgos críticos sin plan, acciones vencidas, servicios críticos con DR sin validar y alertas de capacidad. |
-| **Respaldo** | Exportar / importar el estado como JSON y comenzar desde datos de prueba o un espacio vacío. |
+> **Estado de versiones — 19/11/2026:** `main` contiene **ATLAS V4**, una aplicación funcional con persistencia local en el navegador. La interfaz premium V5 y el backend multiusuario con Cloudflare Access/D1 están desarrollados en el **PR #8 (borrador)** y validados en entornos de prueba; **no deben confundirse con capacidades publicadas en producción**. La dirección pública sigue mostrando la versión anterior mientras no se realice un despliegue verificado. Todos los datos iniciales son **ficticios**.
 
-## Circuito funcional que demuestra el proyecto
+---
 
-1. **Assessment:** registrar un hallazgo en una vertical con puntuación de madurez baja.
-2. **Riesgo:** ATLAS crea automáticamente un riesgo vinculado, inicialmente **sin plan**.
-3. **Plan de acción:** definir responsable y fecha. El riesgo pasa a **con plan**.
-4. **Ejecución:** completar la acción aportando evidencia.
-5. **Cierre:** validar la mitigación del riesgo con evidencia independiente.
-6. **Indicadores:** la situación ejecutiva se actualiza a partir de los registros y sus relaciones.
+## Qué problema resuelve
 
-La segunda automatización vincula **mediciones de capacity sobre el umbral** con riesgos. Los KPI y KR se recalculan cuando los registros cambian: un riesgo que recibe un plan modifica la cobertura, los riesgos sin plan y los OKR que dependan de esas métricas. La puntuación de exposición resulta de **probabilidad × impacto**, no de un modelo probabilístico.
+En organizaciones con servicios críticos, la información de incidentes, capacidad, resiliencia y riesgos suele quedar repartida entre equipos y herramientas. Una dirección tecnológica necesita relacionar esas señales antes de priorizar inversión, mitigación y continuidad.
 
-## ITSM: incidentes, importación flexible y métricas derivadas
+ATLAS propone un circuito unificado de **observación → evaluación → riesgo → acción → evidencia → decisión**. No pretende sustituir un ITSM empresarial ni ser una plataforma de monitoreo en tiempo real.
 
-ATLAS importa incidentes desde CSV con identificador, servicio, prioridad P1–P4, apertura, resolución ISO 8601 con zona horaria y descripción. Se valida todo el lote antes de aplicar cambios y se reconocen IDs repetidos sin duplicar registros.
+## Capacidades funcionales de V4
 
-El módulo calcula MTTR de 90 días, P1/P2 de 30 días, incidentes abiertos, estadísticas por servicio y tendencias mensuales. Se incorporan tres nuevos KPI vinculables a OKR: MTTR (min), P1/P2 y pendientes. **Total: 13 métricas calculables.**
+| Dimensión | Qué se puede hacer |
+| --- | --- |
+| **Gobierno y equipos** | Administrar verticales, responsables y evaluaciones de madurez. |
+| **Riesgos y remediación** | Registrar probabilidad e impacto, generar riesgos desde hallazgos y capacidad, vincular planes y exigir evidencia de cierre. |
+| **Operaciones e incidentes** | Importar CSV mediante un asistente de columnas, validar y deduplicar incidentes, calcular MTTR y tendencias. |
+| **Capacidad tecnológica y de equipos** | Registrar utilización, umbrales, cobertura y proyección de recursos; crear riesgos por desvíos. |
+| **Continuidad y disponibilidad** | Gestionar SLA, disponibilidad calculada, RTO/RPO y resultados documentados de pruebas de recuperación. |
+| **KPI y OKR** | Seguir indicadores derivados de registros, vincular resultados clave y conservar evidencia de cierre. |
+| **Comité y decisiones** | Registrar decisiones, responsable, fecha objetivo, riesgo asociado y resolución. |
+| **Portabilidad de datos** | Exportar e importar un respaldo JSON desde el navegador. |
 
-**Novedad V4:** importa CSV de distintas herramientas mediante asistente de columnas, servicios, prioridades y zonas horarias explícitas. Filtra incidentes por vertical y servicio y permite definir KPI con alcance de una vertical para alimentar OKR segmentados. No equivale a conectarse directamente con ServiceNow o Jira.
+### Un circuito de decisión que se puede probar
 
-Importante: MTTR de tickets no es indisponibilidad real. El CSV no modifica automáticamente los minutos de caída ni los indicadores SLA de servicios.
+```text
+Assessment de un dominio
+         │ Hallazgo de baja madurez
+         ▼
+ Riesgo identificado ──► Priorización por impacto y probabilidad
+         │
+         ▼
+ Plan de acción + responsable + fecha
+         │
+         ▼
+ Ejecución y evidencia documentada
+         │
+         ▼
+ Validación de mitigación
+         │
+         ▼
+ Indicadores y comité de tecnología
+```
 
-## Ejecución local
+El ejemplo es **funcional, no una animación**: la información se modifica mediante formularios, las reglas operan sobre esos registros y el tablero refleja sus cambios.
 
-Requiere Node.js 22 o posterior, sin instalar dependencias para el build.
+## Visión de producto: ATLAS V5
+
+**“Visibilidad para decidir.”** es la identidad visual aprobada para la evolución V5: navegación compacta, indicadores editoriales, **Core** y ocho dominios tecnológicos, cinco perspectivas, prioridades de dirección y experiencia responsive.
+
+La rama de desarrollo incorpora, además, un modelo multiusuario con aislamiento por organización, roles, versiones de workspace, auditoría y ejercicios locales de recuperación. **Su implementación en código y las pruebas no equivalen a activación en Cloudflare.**
+
+| Disponible en la rama V5 | Pendiente de habilitación operativa |
+| --- | --- |
+| Diseño ejecutivo integrado en la aplicación real | Homologación de Cloudflare Access y D1 en la cuenta |
+| Roles, workspaces y aislamiento probados localmente | Verificación de costos, cuotas y configuración remota |
+| Auditoría, control de concurrencia y recuperación local | Despliegue y validación final con identidades reales |
+| Pruebas de navegador a 1700 px y 430 px | Certificación WCAG AA y fidelidad visual exhaustiva |
+
+**[Diseño, evidencias y diferencias conocidas](docs/DEMO_GUIDE.md)** · **[PR de evolución V5](https://github.com/augustogjmm/ATLAS-Enterprise-IT-Operations-Resilience/pull/8)**
+
+## Calidad de ingeniería
+
+[![ATLAS · Calidad y reproducibilidad](https://github.com/augustogjmm/ATLAS-Enterprise-IT-Operations-Resilience/actions/workflows/quality.yml/badge.svg?branch=main)](https://github.com/augustogjmm/ATLAS-Enterprise-IT-Operations-Resilience/actions/workflows/quality.yml)
+
+- **Motor determinista:** métricas reproducibles a partir de registros; no se inventan datos de operación.
+- **Validaciones de dominio:** restricciones de cierre, trazabilidad de acciones y consistencia de importaciones.
+- **Pruebas de extremo a extremo:** escenarios en Chromium sobre formularios, persistencia, importaciones, exportaciones y pantallas móviles.
+- **Separación de responsabilidades:** módulos de dominio, presentación y preparación de artefactos estáticos.
+
+### Ejecutar localmente
+
+Requiere **Node.js 22 o superior** y Python 3 para el servidor estático de ejemplo.
 
 ```bash
+git clone https://github.com/augustogjmm/ATLAS-Enterprise-IT-Operations-Resilience.git
+cd ATLAS-Enterprise-IT-Operations-Resilience
 npm run check
 npm test
 npm run build
 python -m http.server 8080 --directory dist
 ```
 
-Abrir `http://localhost:8080`. La aplicación principal es **ATLAS Governance**. El simulador anterior de resiliencia permanece disponible en `/simulador.html`, separado del flujo de gestión.
+Abrir **http://localhost:8080/**. El simulador de resiliencia anterior continúa disponible en **/simulador.html**. La ejecución local no requiere credenciales de Cloudflare.
 
-La CI incorpora pruebas automatizadas del dominio y pruebas en Chromium que cubren formularios, reglas de negocio, trazabilidad, persistencia, exportación y móvil.
+## Arquitectura y documentación
 
-## Arquitectura
+| Documento | Para qué sirve |
+| --- | --- |
+| [Guía de demostración](docs/DEMO_GUIDE.md) | Recorrido corto para una entrevista o revisión ejecutiva. |
+| [Arquitectura y decisiones](docs/ARCHITECTURE.md) | Separación de componentes y límites técnicos. |
+| [Gobierno funcional](docs/GOBIERNO_FUNCIONAL_V1.md) | Reglas que convierten hallazgos en riesgos y acciones. |
+| [Metodología KPI/OKR](docs/KPI_OKR_METODOLOGIA.md) | Definiciones, alcances y fórmulas. |
+| [Incidentes y MTTR](docs/INCIDENTES_MTTR_CSV.md) | Interpretación de métricas e importación de registros. |
+| [Importación flexible V4](docs/IMPORTACION_FLEXIBLE_Y_KPI_VERTICAL_V4.md) | Mapeo de CSV y segmentación. |
+| [Seguridad y limitaciones](SECURITY.md) | Alcance demostrativo, datos locales y manejo responsable. |
+| [Evolución V5](https://github.com/augustogjmm/ATLAS-Enterprise-IT-Operations-Resilience/pull/8) | Desarrollo, pruebas y revisión pendiente. |
 
-```text
-Navegador / ATLAS Governance
-  ├── public/index.html          -> experiencia de gobierno
-  ├── public/governance.css      -> presentación responsive
-  ├── public/governance.js       -> formularios, gestión, respaldos
-  ├── src/governance/core.js     -> motor de dominio determinista\n  ├── src/governance/insights.js -> semáforos ejecutivos, matriz de riesgos y status por vertical\n  ├── src/governance/performance.js -> métricas KPI y progreso de OKR verificables
-  ├── src/governance/incidents.js -> importación CSV, incidentes, MTTR y tendencias
-  ├── public/incidents-ui.js -> panel de incidentes y CSV\n  ├── public/performance-ui.js  -> tablero de indicadores y objetivos
-  └── localStorage              -> persistencia por navegador
+## Sobre el autor
 
-Simulador conceptual anterior
-  ├── public/simulador.html
-  ├── public/app.js
-  └── src/engine.js + src/data.js
-```
+**Augusto García Juárez Matorras** — líder de tecnología con más de 20 años de trayectoria en servicios financieros, infraestructura crítica, ingeniería y operaciones. Experiencia en gestión de equipos multidisciplinarios, arquitectura empresarial, continuidad, transformación tecnológica y gobierno de servicios críticos.
 
-El build copia `public/` y `src/` a `dist/`, preparado para **Cloudflare Workers Static Assets** sin backend dinámico, secretos ni pago obligatorio.
+ATLAS es un **proyecto personal de demostración**: expresa una manera de abordar problemas de dirección tecnológica mediante sistemas, datos, responsabilidades y decisiones verificables. **No representa un sistema interno ni expone información de empleadores anteriores.**
 
-## KPI / OKR: funcionalidad real y límites
+[LinkedIn profesional](https://www.linkedin.com/in/augustog/) · [Perfil de GitHub](https://github.com/augustogjmm)
 
-Un KPI selecciona una **fórmula predefinida**, un objetivo numérico y un responsable. El sistema deriva su valor de los registros locales del workspace; cuando no existe base suficiente, aparece **«Sin evaluar»**, nunca un falso «en meta».
+---
 
-Los OKR tienen responsables, fecha de inicio/fin y resultados clave relacionados con los KPI. Cada KR requiere línea base y meta; su progreso deriva del KPI y se limita al intervalo 0–100 %. El promedio del objetivo solo considera KR medidos, con advertencia si existen KR sin datos. El cierre requiere evidencia y congela el resultado observado en ese instante.
-
-La pantalla **KPI y OKR tecnológicos** incorpora demostraciones ficticias en una instalación nueva. Los usuarios con registros ya editados conservan todos sus datos; pueden crear sus propios KPI o incorporar ejemplos voluntariamente sin sobrescribir los registros operativos.
-
-Los KPI disponibles son un **catálogo acotado de mediciones calculables**, no una plataforma completa de gestión de incidentes o importación ITSM. Todavía no hay fórmulas personalizadas por vertical, series históricas, presupuestos reales ni integraciones productivas.
-
-## Seguridad y límites de uso
-
-**Persistencia real, pero local y de un solo navegador:** los registros pueden modificarse, mantenerse tras recargar y exportarse/importarse. **No son datos compartidos ni sincronizados en la nube**. Si se borra el almacenamiento del navegador o se utiliza otro dispositivo, los registros no estarán disponibles sin importar un respaldo. No hay autenticación, permisos, auditoría independiente o acceso multiusuario.
-
-**No cargar información empresarial confidencial ni datos personales.** Este entorno público está concebido como demostración. Los datos iniciales son ficticios; si el usuario introduce información propia, la aplicación no puede verificarla automáticamente.
-
-La siguiente evolución prevista es D1 + autenticación + control por roles, previo diseño de seguridad y validación de cuotas del plan gratuito. Quedan pendientes conectores ITSM productivos, mapeo de formatos de terceros, KPI por vertical y auditoría de origen. No se declaran implementados.
-
-## Documentación
-
-- [Modelo y criterios del primer circuito funcional](docs/GOBIERNO_FUNCIONAL_V1.md)\n- [Definiciones y metodología KPI/OKR](docs/KPI_OKR_METODOLOGIA.md)
-- [Importación ITSM, CSV y metodología MTTR](docs/INCIDENTES_MTTR_CSV.md)
-- [Asistente de mapeo CSV y KPI segmentados por vertical](docs/IMPORTACION_FLEXIBLE_Y_KPI_VERTICAL_V4.md)
-- [Simulador de resiliencia y su arquitectura](docs/ARCHITECTURE.md)
-- [Guía de Cloudflare](docs/DESPLIEGUE_CLOUDFLARE.md)
-- [Seguridad](SECURITY.md)
-
-**Autor:** Augusto García Juárez Matorras · [LinkedIn](https://www.linkedin.com/in/augustog/)
-
-No se ha asignado aún una licencia general de reutilización.
+<sub>**Uso y límites.** Los registros iniciales son sintéticos y no constituyen monitoreo real. No ingresar información personal, confidencial o regulada. Los datos de la versión pública se guardan en el navegador; limpiar su almacenamiento puede eliminarlos. **No hay licencia de reutilización concedida** mientras el propietario no publique expresamente una. El acceso público al código no supone autorización para copiarlo, redistribuirlo o explotarlo comercialmente.</sub>
