@@ -132,3 +132,13 @@ button:focus-visible,a:focus-visible,input:focus-visible,[tabindex]:focus-visibl
 .atlas-hit small{font-size:10px;color:#729082}
 .atlas-modal-disclaimer{color:#758b81;font-size:11px}
 @media(max-width:720px){.topbar .breadcrumb{max-width:45%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.topbar .breadcrumb span.command-header-divider,.topbar #atlas-organization{display:none}.topbar .top-actions{gap:2px}.topbar .top-status{font-size:0}.topbar .top-status .indicator{font-size:10px}.atlas-top-icon{width:27px;height:30px}.atlas-top-avatar{height:29px;width:29px;font-size:9px}}
+
+.workspace-tools{border:0;margin:0 0 6px;padding:0}
+.workspace-tools>summary{list-style:none;display:flex;align-items:center;gap:12px;cursor:pointer;font-size:10px;letter-spacing:.06em;color:#5a756d;font-weight:750;padding:8px 0;min-height:30px}
+.workspace-tools>summary::-webkit-details-marker{display:none}
+.workspace-tools>summary:before{content:"⚙";font-size:14px;color:#1e8b7c}
+.workspace-tools>summary span{font-size:9px;color:#93a49a;font-weight:500}
+.workspace-tools[open]>summary{color:#165d53;margin-bottom:6px}
+.workspace-tools:not([open]){max-width:max-content}
+.workspace-tools .toolbar,.workspace-tools .workspace-panel{margin-bottom:12px}
+@media(max-width:720px){.workspace-tools>summary{font-size:9px;gap:6px}.workspace-tools>summary span{display:none}}
