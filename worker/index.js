@@ -98,6 +98,25 @@ async function getWorkspace(db, tenantId, id) {
   return row;
 }
 
+
+function liveMembershipSql(permission){
+  // El permiso se verifica nuevamente EN la sentencia de escritura D1.
+  // Evita que una petición autorizada inicialmente escriba tras revocación concurrente.
+  const roles=permission==='restore'?"'owner','admin'":"'owner','admin','editor'";
+  return 'EXISTS(SELECT 1 FROM atlas_memberships m JOIN atlas_tenants t ON t.id=m.tenant_id '+
+    "WHERE m.tenant_id=? AND m.email=? AND m.access_sub=? AND m.status='active' "+
+    "AND t.status='active' AND m.role IN ("+roles+"))";
+}
+const liveMembershipArgs=(tenantId,identity)=>[tenantId,identity.email,identity.sub];
+async function requireStillAllowed(db,tenantId,identity,permission){
+  const row=await db.prepare(
+    "SELECT m.role FROM atlas_memberships m JOIN atlas_tenants t ON t.id=m.tenant_id "+
+    "WHERE m.tenant_id=? AND m.email=? AND m.access_sub=? AND m.status='active' AND t.status='active'"
+  ).bind(...liveMembershipArgs(tenantId,identity)).first();
+  if(!row||!can(row.role,permission))
+    throw new ApiError('Acceso revocado o permisos modificados durante la operación',403);
+}
+
 function storeRevision(db,tenantId,workspaceId,revision,email,at,auditId) {
   return db.prepare(
     'INSERT INTO atlas_workspace_revisions(tenant_id,workspace_id,revision,state_json,actor_email,created_at) '+
@@ -168,16 +187,20 @@ export function createHandler({verify = verifyAccessToken} = {}) {
         const created=await db.batch([
           db.prepare(
             'INSERT INTO atlas_workspaces(id,tenant_id,name,revision,state_json,created_by,updated_by,created_at,updated_at) '+
-            'SELECT ?,?,?,?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM atlas_workspaces WHERE tenant_id=?) < ?'
-          ).bind(id,tenantId,name,1,JSON.stringify(state),identity.email,identity.email,now,now,tenantId,MAX_WORKSPACES_PER_TENANT),
+            'SELECT ?,?,?,?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM atlas_workspaces WHERE tenant_id=?) < ? '+
+            'AND '+liveMembershipSql('write')
+          ).bind(id,tenantId,name,1,JSON.stringify(state),identity.email,identity.email,now,now,
+            tenantId,MAX_WORKSPACES_PER_TENANT,...liveMembershipArgs(tenantId,identity)),
           db.prepare(
             'INSERT INTO atlas_audit_events(id,tenant_id,workspace_id,actor_email,action,previous_revision,new_revision,metadata_json,occurred_at) '+
             'SELECT ?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM atlas_workspaces WHERE id=? AND tenant_id=?)'
           ).bind(auditId,tenantId,id,identity.email,'workspace.created',null,1,JSON.stringify({name}),now,id,tenantId),
           storeRevision(db,tenantId,id,1,identity.email,now,auditId)
         ]);
-        if (created[0]?.meta?.changes !== 1)
+        if (created[0]?.meta?.changes !== 1){
+          await requireStillAllowed(db,tenantId,identity,'write');
           throw new ApiError('Se alcanzó el límite de '+MAX_WORKSPACES_PER_TENANT+' workspaces por organización',429);
+        }
         return reply({id,name,revision:1},201);
       }
       if (resource==='workspaces' && path.length===6 && request.method==='GET') {
@@ -202,17 +225,23 @@ export function createHandler({verify = verifyAccessToken} = {}) {
         // D1.batch ejecuta las instrucciones en una única transacción.
         // Verificar la revisión ANTES de actualizar evita auditar escrituras rechazadas.
         const outcome=await db.batch([
-          db.prepare('INSERT INTO atlas_audit_events(id,tenant_id,workspace_id,actor_email,action,previous_revision,new_revision,metadata_json,occurred_at) SELECT ?,?,?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM atlas_workspaces WHERE id=? AND tenant_id=? AND revision=?)')
+          db.prepare('INSERT INTO atlas_audit_events(id,tenant_id,workspace_id,actor_email,action,previous_revision,new_revision,metadata_json,occurred_at) '+
+            'SELECT ?,?,?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM atlas_workspaces WHERE id=? AND tenant_id=? AND revision=?) '+
+            'AND '+liveMembershipSql('write'))
             .bind(auditId,tenantId,path[5],identity.email,'workspace.updated',expected,newRevision,
               JSON.stringify({kind:state.kind,risks:state.risks.length,actions:state.actions.length,incidents:state.incidents.length}),
-              now,path[5],tenantId,expected),
-          db.prepare('UPDATE atlas_workspaces SET state_json=?,revision=revision+1,updated_by=?,updated_at=? WHERE id=? AND tenant_id=? AND revision=?')
-            .bind(JSON.stringify(state),identity.email,now,path[5],tenantId,expected),
+              now,path[5],tenantId,expected,...liveMembershipArgs(tenantId,identity)),
+          db.prepare('UPDATE atlas_workspaces SET state_json=?,revision=revision+1,updated_by=?,updated_at=? '+
+            'WHERE id=? AND tenant_id=? AND revision=? AND '+liveMembershipSql('write'))
+            .bind(JSON.stringify(state),identity.email,now,path[5],tenantId,expected,
+              ...liveMembershipArgs(tenantId,identity)),
           storeRevision(db,tenantId,path[5],newRevision,identity.email,now,auditId),
           pruneRevisions(db,tenantId,path[5],auditId)
         ]);
-        if (outcome[1]?.meta?.changes !== 1)
+        if (outcome[1]?.meta?.changes !== 1){
+          await requireStillAllowed(db,tenantId,identity,'write');
           throw new ApiError('Conflicto de edición: recargá el workspace antes de guardar',409);
+        }
         return reply({id:path[5],revision:newRevision,updatedAt:now});
       }
       if (resource==='workspaces' && path.length===7 && path[6]==='revisions' && request.method==='GET') {
@@ -239,18 +268,24 @@ export function createHandler({verify = verifyAccessToken} = {}) {
         const results=await db.batch([
           db.prepare(
             'INSERT INTO atlas_audit_events(id,tenant_id,workspace_id,actor_email,action,previous_revision,new_revision,metadata_json,occurred_at) '+
-            'SELECT ?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM atlas_workspaces WHERE tenant_id=? AND id=? AND revision=?)'
+            'SELECT ?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM atlas_workspaces WHERE tenant_id=? AND id=? AND revision=?) '+
+            'AND '+liveMembershipSql('restore')
           ).bind(auditId,tenantId,path[5],identity.email,'workspace.restored',expected,newRevision,
-            JSON.stringify({sourceRevision:target}),now,tenantId,path[5],expected),
+            JSON.stringify({sourceRevision:target}),now,tenantId,path[5],expected,
+            ...liveMembershipArgs(tenantId,identity)),
           db.prepare(
             'UPDATE atlas_workspaces SET state_json=(SELECT state_json FROM atlas_workspace_revisions WHERE tenant_id=? AND workspace_id=? AND revision=?), '+
-            'revision=revision+1,updated_by=?,updated_at=? WHERE id=? AND tenant_id=? AND revision=?'
-          ).bind(tenantId,path[5],target,identity.email,now,path[5],tenantId,expected),
+            'revision=revision+1,updated_by=?,updated_at=? WHERE id=? AND tenant_id=? AND revision=? '+
+            'AND '+liveMembershipSql('restore')
+          ).bind(tenantId,path[5],target,identity.email,now,path[5],tenantId,expected,
+            ...liveMembershipArgs(tenantId,identity)),
           storeRevision(db,tenantId,path[5],newRevision,identity.email,now,auditId),
           pruneRevisions(db,tenantId,path[5],auditId)
         ]);
-        if (results[1]?.meta?.changes !== 1)
+        if (results[1]?.meta?.changes !== 1){
+          await requireStillAllowed(db,tenantId,identity,'restore');
           throw new ApiError('Conflicto de edición: recargá el workspace antes de restaurar',409);
+        }
         return reply({id:path[5],revision:newRevision,restoredFrom:target,updatedAt:now});
       }
       if (resource==='audit' && path.length===5 && request.method==='GET') {
