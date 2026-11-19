@@ -31,10 +31,12 @@ const mf=new Miniflare({
 try{
   const db=await mf.getD1Database('ATLAS_DB');
   for(const name of ['0001_atlas_v5.sql','0002_atlas_v5_history.sql']){
-    // D1.exec local separa sentencias por línea y no acepta líneas de comentario como SQL.
+    // D1.exec interpreta líneas de manera distinta a SQLite; cada sentencia completa
+    // se ejecuta con D1.prepare/run para probar el API real sin romper CREATE multilínea.
     const sql=(await readFile(new URL('../migrations/'+name,import.meta.url),'utf8'))
       .split('\n').filter(line=>!line.trimStart().startsWith('--')).join('\n');
-    await db.exec(sql);
+    for(const statement of sql.split(';').map(x=>x.trim()).filter(Boolean))
+      await db.prepare(statement).run();
   }
   assert.equal((await db.prepare('PRAGMA integrity_check').first()).integrity_check,'ok');
   const stamp='2026-11-18T00:00:00.000Z';
