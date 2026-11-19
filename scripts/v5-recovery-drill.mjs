@@ -59,6 +59,7 @@ function integrity(db){
 let db,restored;
 try {
  db=new DatabaseSync(source);
+ db.exec('PRAGMA foreign_keys=ON'); // SQLite local, D1 lo impone sin este PRAGMA.
  for(const file of ['0001_atlas_v5.sql','0002_atlas_v5_history.sql'])
   db.exec(readFileSync(new URL('../migrations/'+file,import.meta.url),'utf8'));
  integrity(db);
@@ -89,6 +90,7 @@ try {
  copyFileSync(backup,restore);
  assert.equal(checksum(readFileSync(restore)),originalChecksum);
  restored=new DatabaseSync(restore);
+ restored.exec('PRAGMA foreign_keys=ON');
  integrity(restored);
  const loaded=await api(restored,'GET',path);
  assert.equal(loaded.status,200);
