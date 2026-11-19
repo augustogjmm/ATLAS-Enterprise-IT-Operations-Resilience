@@ -374,11 +374,12 @@ export function createHandler({verify = verifyAccessToken} = {}) {
           (beforeAt===null?'':' AND (occurred_at < ? OR (occurred_at = ? AND id < ?))')+
           ' ORDER BY occurred_at DESC,id DESC LIMIT 101';
         const args=beforeAt===null?[tenantId]:[tenantId,beforeAt,beforeAt,beforeId];
+        const totalEvents=(await db.prepare('SELECT COUNT(*) AS total FROM atlas_audit_events WHERE tenant_id=?').bind(tenantId).first()).total;
         const records=(await db.prepare(sql).bind(...args).all()).results;
         const hasMore=records.length>100;
         const page=records.slice(0,100);
         const last=page.at(-1);
-        return reply({events:page.map(x=>({...x,metadata:JSON.parse(x.metadata_json),metadata_json:undefined})),
+        return reply({totalEvents,events:page.map(x=>({...x,metadata:JSON.parse(x.metadata_json),metadata_json:undefined})),
           nextCursor:hasMore?{beforeAt:last.occurred_at,beforeId:last.id}:null});
       }
       if (resource==='audit' && path.length===5 && request.method==='GET') {
