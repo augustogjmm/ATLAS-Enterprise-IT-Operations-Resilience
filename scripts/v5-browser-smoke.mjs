@@ -87,7 +87,7 @@ try{
   await editor.page.getByText('Compartido: Gobierno Compartido').waitFor();
   assert.ok((await editor.page.locator('#workspace-panel').innerText()).includes('editor'));
 
-  await editor.page.locator('[data-view="verticals"]').click();
+  await editor.page.locator('.sidebar [data-view="verticals"]').click();
   await editor.page.locator('[data-open="vertical"]').first().click();
   await editor.page.locator('#field-name').fill('Vertical V5 compartida');
   await editor.page.locator('#field-owner').fill('Director de Tecnología');
@@ -128,7 +128,7 @@ try{
   await uncertain.page.getByText('Compartido: Gobierno Compartido').waitFor();
   const uncertainLocal=await uncertain.page.evaluate(()=>localStorage.getItem('atlas-governance-workspace-v1'));
   uncertain.loseAckOnce();
-  await uncertain.page.locator('[data-view="verticals"]').click();
+  await uncertain.page.locator('.sidebar [data-view="verticals"]').click();
   await uncertain.page.locator('[data-open="vertical"]').first().click();
   await uncertain.page.locator('#field-name').fill('Operación guardada sin confirmación');
   await uncertain.page.locator('#field-owner').fill('Sistemas');
@@ -151,7 +151,7 @@ try{
   await viewer.page.locator('[data-workspace-command="open"]').waitFor();
   await viewer.page.locator('[data-workspace-command="open"]').click();
   await viewer.page.getByText('Compartido: Gobierno Compartido').waitFor();
-  await viewer.page.locator('[data-view="verticals"]').click();
+  await viewer.page.locator('.sidebar [data-view="verticals"]').click();
   assert.equal(await viewer.page.locator('[data-open="vertical"]').first().isDisabled(),true,
     'Viewer no debe poder abrir formularios de edición');
   assert.equal(await viewer.page.locator('[data-workspace-command="create"]').isDisabled(),true);
