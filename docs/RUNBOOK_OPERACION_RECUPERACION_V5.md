@@ -139,3 +139,9 @@ node scripts/v5-verify-audit-export.mjs atlas-v5-auditoria-org-demo-AAAA-MM-DD.j
 ```
 
 El verificador rechaza alteraciones de eventos, conteos inconsistentes y IDs duplicados. Para custodia formal, almacenar aparte un hash SHA-256 **del archivo completo**, el contexto de exportación y controles independientes de acceso. Una huella incorporada en el mismo archivo no demuestra autenticidad frente a un atacante capaz de modificar ambos elementos. La V5 sigue en etapa demostrativa, sin retención WORM ni garantía de evidencia regulatoria.
+
+## Ensayo adicional de restauración SQLite con manifiesto
+
+El ensayo **local y sintético** `node scripts/v5-recovery-drill.mjs` genera una copia SQLite mediante `VACUUM INTO` (solo SQLite local, **no** Cloudflare D1) y construye un manifiesto con longitud en bytes, SHA-256 del archivo completo y conteos de las cinco tablas ATLAS. Antes de abrir la copia restaurada, compara tamaño y digest, y simula una alteración y un truncamiento que deben rechazarse. Luego comprueba `PRAGMA integrity_check`, claves foráneas, conteos, estado de workspace, historial y continuidad de lectura/escritura.
+
+El manifiesto se genera y usa dentro del propio ensayo; **no existe todavía un pipeline productivo de exportación de D1 ni archivo de manifiesto externo persistido**. Los conteos y el SHA-256 detectan corrupción y pérdidas accidentales; no verifican por sí solos la identidad del autor ni constituyen custodia regulatoria. Una futura homologación debe documentar el mecanismo de exportación oficial de D1 disponible en el plan de la cuenta, frecuencia de backups, retención, almacenamiento seguro, permisos y medición real de RPO/RTO, sin asumir costos cero hasta verificarlos.
