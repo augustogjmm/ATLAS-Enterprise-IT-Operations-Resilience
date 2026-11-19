@@ -6,6 +6,11 @@
 
 > **Versión funcional V4:** plataforma estática, con operaciones reales sobre datos almacenados en **el navegador del usuario**. El contenido de inicio es 100% ficticio, identificado como demostración. No monitorea infraestructura ni conecta servicios productivos. No utiliza todavía D1 ni autenticación multiusuario.
 
+## Cómo acceder a ATLAS
+
+- **V4 publicada:** [Abrir ATLAS Governance](https://atlas-enterprise-it-operations-resilience.augusto-garciajm.workers.dev/). No requiere usuario y conserva los datos en el navegador; utilizar solo información ficticia.
+- **V5 multiusuario:** [seguir el PR #8](https://github.com/augustogjmm/ATLAS-Enterprise-IT-Operations-Resilience/pull/8). Todavía **no existe una URL pública ni un entorno de acceso real**; requiere autorización para provisionar Access, D1 y un Worker independiente.
+
 ## ATLAS V5 — Evolución multiusuario en desarrollo (PR #8)
 
 > **Esta rama no es la versión publicada.** La V4 de `main` continúa pública y exclusivamente local. V5 no ha creado D1, habilitado Cloudflare Access ni activado servicios de pago.

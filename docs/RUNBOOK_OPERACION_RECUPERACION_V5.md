@@ -99,6 +99,7 @@ La tabla de revisiones deberá conservar como máximo 5 entradas por workspace. 
 | HTTP 429 | Se alcanzó el cupo de workspaces; revisar capacidad antes de cambiar el límite |
 | HTTP 503 | D1 o configuración de Access no disponible; mantener V4 local como alternativa |
 | Respuesta perdida después del PUT | Leer revisión actual con «Verificar guardado en servidor»; el servidor podría haber aplicado la operación. Si el estado coincide, continuar sin duplicarla; si difiere, exportar y resolver el conflicto |
+| Espera agotada en cliente (15 segundos) | El cliente interrumpe la consulta o escritura sin reintentar automáticamente. Para PUT/POST se desconoce si el servidor llegó a confirmar: verificar el workspace remoto y exportar cambios pendientes antes de cualquier nuevo envío |
 | Acceso revocado durante una escritura | El Worker vuelve a verificar permisos en SQL; ante HTTP 403 conservar y exportar cambios locales, contactar a un `owner` sin intentar eludir los controles |
 | Restauración no confirmada | Evitar reintentar a ciegas; consultar la revisión actual y auditoría |
 | Pérdida de propietario | Recuperación de membresía mediante procedimiento administrativo auditado; no crear bypass en frontend |

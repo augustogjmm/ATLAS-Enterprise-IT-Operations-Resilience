@@ -10,26 +10,37 @@ export class RemoteWorkspaceError extends Error {
 const segment=value=>encodeURIComponent(String(value));
 
 export class RemoteWorkspaces {
-  constructor(fetcher=(url,options)=>fetch(url,options), base='/api/v1') {
+  constructor(fetcher=(url,options)=>fetch(url,options), base='/api/v1', timeoutMs=15000) {
+    if (!Number.isFinite(timeoutMs) || timeoutMs<1)
+      throw new RangeError('Tiempo de espera V5 inválido');
     this.fetcher=fetcher;
     this.base=base;
+    this.timeoutMs=timeoutMs;
   }
   async request(path,{method='GET',body}={}) {
-    let response;
+    const controller=new AbortController();
+    const timeout=setTimeout(()=>controller.abort(),this.timeoutMs);
+    let response,result;
     try {
       response=await this.fetcher(this.base+path,{
         method,
         cache:'no-store',
         credentials:'same-origin',
+        signal:controller.signal,
         headers:{Accept:'application/json',...(body===undefined?{}:{'Content-Type':'application/json','X-Atlas-CSRF':'v5'})},
         ...(body===undefined?{}:{body:JSON.stringify(body)})
       });
+      result=await response.json();
     } catch {
+      if(controller.signal.aborted){
+        const warning=method==='GET'
+          ? 'Podés intentar la consulta nuevamente.'
+          : 'La operación podría haberse aplicado en el servidor. Consultá su estado antes de repetirla.';
+        throw new RemoteWorkspaceError('Tiempo de espera agotado en V5. '+warning+' Los datos locales no fueron modificados.');
+      }
+      if(response)throw new RemoteWorkspaceError('La API V5 respondió con un formato inválido.',response.status);
       throw new RemoteWorkspaceError('No se pudo contactar al servidor V5. El contenido local no fue modificado.');
-    }
-    let result;
-    try{result=await response.json();}
-    catch{throw new RemoteWorkspaceError('La API V5 respondió con un formato inválido.',response.status);}
+    } finally {clearTimeout(timeout);}
     if(!response.ok)throw new RemoteWorkspaceError(
       typeof result?.error==='string'?result.error:'Error de servidor V5',response.status);
     return result;

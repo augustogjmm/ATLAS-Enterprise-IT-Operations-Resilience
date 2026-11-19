@@ -68,3 +68,35 @@ test('historial remoto y restauración envían revisión esperada y cabecera CSR
   assert.equal(calls[1].options.headers['X-Atlas-CSRF'],'v5');
   assert.deepEqual(JSON.parse(calls[1].options.body),{revision:2});
 });
+
+ 
+test('timeout de escritura informa estado incierto sin repetir PUT',async()=>{
+  let requests=0;
+  const api=new RemoteWorkspaces((url,options)=>new Promise((resolve,reject)=>{
+    requests++;
+    options.signal.addEventListener('abort',()=>reject(new DOMException('abortado','AbortError')),{once:true});
+  }),'/api/v1',20);
+  await assert.rejects(api.save('org','w',2,{version:1}),e=>
+    e instanceof RemoteWorkspaceError&&e.status===0&&/podría haberse aplicado/.test(e.message));
+  assert.equal(requests,1,'Un PUT incierto nunca debe reintentarse automáticamente');
+});
+
+test('timeout de GET recomienda consultar otra vez sin indicar escritura incierta',async()=>{
+  const api=new RemoteWorkspaces((url,options)=>new Promise((resolve,reject)=>{
+    options.signal.addEventListener('abort',()=>reject(new DOMException('abortado','AbortError')),{once:true});
+  }),'/api/v1',15);
+  await assert.rejects(api.session(),e=>e instanceof RemoteWorkspaceError &&
+    /intentar la consulta nuevamente/.test(e.message) && !/podría haberse aplicado/.test(e.message));
+});
+
+test('el cliente limpia el temporizador después de una respuesta válida',async()=>{
+  let signal;
+  const api=new RemoteWorkspaces(async(url,options)=>{
+    signal=options.signal;
+    return Response.json({tenants:[]});
+  },'/api/v1',20);
+  await api.session();
+  await new Promise(resolve=>setTimeout(resolve,50));
+  assert.equal(signal.aborted,false,'El temporizador no debe dispararse después de finalizar');
+  assert.throws(()=>new RemoteWorkspaces(async()=>Response.json({}),'/api/v1',0),RangeError);
+});
