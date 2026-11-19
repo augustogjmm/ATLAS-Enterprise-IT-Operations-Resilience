@@ -11,6 +11,7 @@ import {makeEmpty} from '../src/governance/core.js';
 let fixtureSequence=0;
 async function setup() {
   const sqlite=new DatabaseSync(':memory:');
+  sqlite.exec('PRAGMA foreign_keys=ON'); // SQLite local imita D1.
   for(const migration of ['0001_atlas_v5.sql','0002_atlas_v5_history.sql']){
     sqlite.exec(readFileSync(new URL('../migrations/'+migration,import.meta.url),'utf8'));
   }
