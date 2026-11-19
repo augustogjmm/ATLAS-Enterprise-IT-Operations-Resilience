@@ -418,3 +418,33 @@ test('API: secuencia de escape inválida en un correo responde 400 sin error int
   assert.equal(valid.status,200);
   assert.equal(valid.body.email,'new-person@a.test');
 });
+
+test('restauración: historial depurado entre prechequeo y transacción no corrompe datos ni auditoría',async()=>{
+  const {call,sqlite,beforeBatch}=fixture();
+  const root='/api/v1/tenants/org-a/workspaces';
+  const created=await call('owner@a.test','POST',root,{name:'Respaldo transaccional',state:makeEmpty()});
+  assert.equal(created.status,201);
+  const path=root+'/'+created.body.id;
+  const changed=makeEmpty();
+  changed.verticals.push({id:'plataformas',name:'Plataformas',owner:'IT',description:''});
+  assert.equal((await call('editor@a.test','PUT',path,{revision:1,state:changed})).status,200);
+  // Ya se comprobó la revisión histórica, pero se elimina justo antes del D1.batch.
+  beforeBatch(db=>db.prepare(
+    'DELETE FROM atlas_workspace_revisions WHERE tenant_id=? AND workspace_id=? AND revision=?'
+  ).run('org-a',created.body.id,1));
+  const attempt=await call('owner@a.test','PUT',path+'/revisions/1/restore',{revision:2});
+  assert.equal(attempt.status,409,JSON.stringify(attempt.body));
+  assert.equal(attempt.body.error,'La revisión histórica ya no está disponible');
+  const current=await call('viewer@a.test','GET',path);
+  assert.equal(current.status,200);
+  assert.equal(current.body.revision,2);
+  assert.deepEqual(current.body.state.verticals.map(v=>v.name),['Plataformas']);
+  const audit=sqlite.prepare(
+    'SELECT action FROM atlas_audit_events WHERE workspace_id=?'
+  ).all(created.body.id);
+  assert.deepEqual(audit.map(x=>x.action).sort(),['workspace.created','workspace.updated']);
+  const history=sqlite.prepare(
+    'SELECT revision FROM atlas_workspace_revisions WHERE workspace_id=?'
+  ).all(created.body.id);
+  assert.deepEqual(history.map(x=>x.revision),[2]);
+});

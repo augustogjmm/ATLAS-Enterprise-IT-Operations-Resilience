@@ -288,21 +288,29 @@ export function createHandler({verify = verifyAccessToken} = {}) {
           db.prepare(
             'INSERT INTO atlas_audit_events(id,tenant_id,workspace_id,actor_email,action,previous_revision,new_revision,metadata_json,occurred_at) '+
             'SELECT ?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM atlas_workspaces WHERE tenant_id=? AND id=? AND revision=?) '+
-            'AND '+liveMembershipSql('restore')
+            'AND '+liveMembershipSql('restore')+
+            ' AND EXISTS(SELECT 1 FROM atlas_workspace_revisions WHERE tenant_id=? AND workspace_id=? AND revision=?)'
           ).bind(auditId,tenantId,path[5],identity.email,'workspace.restored',expected,newRevision,
             JSON.stringify({sourceRevision:target}),now,tenantId,path[5],expected,
-            ...liveMembershipArgs(tenantId,identity)),
+            ...liveMembershipArgs(tenantId,identity),tenantId,path[5],target),
           db.prepare(
             'UPDATE atlas_workspaces SET state_json=(SELECT state_json FROM atlas_workspace_revisions WHERE tenant_id=? AND workspace_id=? AND revision=?), '+
             'revision=revision+1,updated_by=?,updated_at=? WHERE id=? AND tenant_id=? AND revision=? '+
-            'AND '+liveMembershipSql('restore')
+            'AND '+liveMembershipSql('restore')+
+            ' AND EXISTS(SELECT 1 FROM atlas_workspace_revisions WHERE tenant_id=? AND workspace_id=? AND revision=?)'
           ).bind(tenantId,path[5],target,identity.email,now,path[5],tenantId,expected,
-            ...liveMembershipArgs(tenantId,identity)),
+            ...liveMembershipArgs(tenantId,identity),tenantId,path[5],target),
           storeRevision(db,tenantId,path[5],newRevision,identity.email,now,auditId),
           pruneRevisions(db,tenantId,path[5],auditId)
         ]);
         if (results[1]?.meta?.changes !== 1){
           await requireStillAllowed(db,tenantId,identity,'restore');
+          // Una depuración concurrente debe fallar sin escribir NULL ni auditoría.
+          const stillHistoric=await db.prepare(
+            'SELECT 1 AS present FROM atlas_workspace_revisions WHERE tenant_id=? AND workspace_id=? AND revision=?'
+          ).bind(tenantId,path[5],target).first();
+          if(!stillHistoric)
+            throw new ApiError('La revisión histórica ya no está disponible',409);
           throw new ApiError('Conflicto de edición: recargá el workspace antes de restaurar',409);
         }
         return reply({id:path[5],revision:newRevision,restoredFrom:target,updatedAt:now});
