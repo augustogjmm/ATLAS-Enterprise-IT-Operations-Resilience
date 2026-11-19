@@ -27,6 +27,7 @@ export function mountRemoteV5({getState,getLocal,replaceState,notice,validateSta
       if(active()){
         out+=button('reload','Recargar servidor',s.busy);
         if(canAudit(s.role))out+=button('audit','Ver auditoría',s.busy);
+        if(canAudit(s.role))out+=button('audit-export','Exportar auditoría completa',s.busy);
         if(canAudit(s.role))out+=button('history','Historial / recuperación',s.busy);
         if(canManageMembers(s.role))out+=button('members','Ver miembros',s.busy);
         if(canManageMembers(s.role))out+=button('manage','Administrar rol',s.busy);
@@ -217,6 +218,23 @@ export function mountRemoteV5({getState,getLocal,replaceState,notice,validateSta
           s.error='La restauración no pudo verificarse. Evitá nuevas escrituras, exportá tus datos y recargá el workspace: '+(err.message||'fallo remoto');
           notice(s.error,true);
         }
+        return;
+      }
+      if(command==='audit-export'&&active()&&canAudit(s.role)){
+        const tenant=s.tenant;
+        s.busy=true;s.error='';render();
+        const result=await api.exportAudit(tenant);
+        if(tenant!==s.tenant)throw new Error('La organización cambió durante la exportación.');
+        const data=JSON.stringify(result,null,2);
+        const url=URL.createObjectURL(new Blob([data],{type:'application/json'}));
+        try{
+          const a=document.createElement('a');a.href=url;
+          a.download='atlas-v5-auditoria-'+tenant.replace(/[^a-z0-9_-]/gi,'_')+'-'+new Date().toISOString().slice(0,10)+'.json';
+          document.body.append(a);a.click();a.remove();
+        }finally{setTimeout(()=>URL.revokeObjectURL(url),1500);}
+        notice(result.eventCount+' eventos de auditoría exportados. Conservá el archivo en un lugar seguro.');
+        s.details='<strong>Exportación de auditoría</strong><p>'+esc(result.eventCount)+
+          ' eventos descargados en JSON. La lectura es paginada y no representa un snapshot transaccional si se producen escrituras simultáneas. El archivo contiene identidades de usuarios: resguardalo y verificá su integridad antes de archivarlo.</p>';
         return;
       }
       if(command==='audit'&&active()&&canAudit(s.role)){
