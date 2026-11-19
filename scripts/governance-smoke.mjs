@@ -26,7 +26,9 @@ try{
  page.on('pageerror',error=>errors.push('desktop: '+error.message));
  await page.goto(url,{waitUntil:'networkidle'});
  assert.match(await page.title(),/Gobierno/);
- assert.match(await page.locator('h1').innerText(),/Gobernar la operación/i);
+ assert.match(await page.locator('.command-hero h1').innerText(),/Visibilidad para decidir/i);
+ assert.equal(await page.locator('.command-domain').count(),8);
+ await page.locator('button[data-view="operations"]').click();
  assert.equal(await page.locator('link[href="./executive.css"]').count(),1);
  assert.ok(await page.locator('.executive-summary').isVisible());
  assert.equal(await page.locator('.executive-kpi').count(),4);
@@ -37,7 +39,7 @@ try{
  const executiveSkin=await page.locator('.page-frame').evaluate(el=>getComputedStyle(el).backgroundColor);
  assert.ok(executiveSkin!=='rgb(0, 0, 0)');
  assert.equal((await page.locator('.executive-kpi strong').allInnerTexts())[0],'1');
- assert.ok(await page.getByText('De la brecha a la acción').isVisible());
+ assert.equal(await page.locator('#view-title').innerText(),'Análisis operativo');
  await page.screenshot({path:resolve(artifacts,'atlas-governance-desktop.png'),fullPage:true});
  // Ingestión ITSM: importar dos incidentes, calcular recuperación, cerrar y persistir.
  await page.locator('button[data-view="incidents"]').click();
