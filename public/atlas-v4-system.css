@@ -152,3 +152,49 @@ button:focus-visible,a:focus-visible,input:focus-visible,[tabindex]:focus-visibl
 .command-domain-strip button{border:0;border-right:1px solid var(--atlas-border);border-radius:0;background:transparent}
 .command-domain-strip button:last-child{border-right:0}
 @media(max-width:720px){.command-domain-strip{grid-template-columns:repeat(4,minmax(0,1fr))}.command-domain-strip button:nth-child(4n){border-right:0}.command-hero h1{font-size:clamp(30px,7.5vw,39px)}}
+
+
+/* Ajuste fino basado en las referencias aprobadas V4 */
+.command-map-area{gap:10px;grid-template-columns:minmax(0,1fr) minmax(160px,.94fr) minmax(0,1fr)}
+.command-domain{display:grid;grid-template-columns:42px minmax(0,1fr);align-items:center;justify-content:initial;gap:10px;min-height:74px;padding:10px 12px}
+.command-domain-icon{height:39px;width:39px;display:grid;place-items:center;border-radius:8px;border:1px solid #dce7df;background:#f7f9f6;color:#366e66}
+.command-glyph{height:22px;width:22px;display:block;stroke:currentColor}
+.command-domain-copy{display:flex;flex-direction:column;gap:4px;min-width:0}
+.command-domain .command-domain-copy strong{font-size:12px;line-height:1.25}
+.command-domain .command-domain-copy small{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#82918d}
+.command-domain .command-domain-copy .command-domain-state{font-size:9px;color:#218870;display:block;line-height:1.2;font-weight:700}
+.command-domain .command-domain-copy .command-domain-state:before{content:"●";font-size:9px;margin-right:5px}
+.command-domain.is-watch .command-domain-state{color:#b97f36}
+.command-domain-column{gap:24px}
+.command-connections path{stroke:#91b9a6;stroke-width:1.5;opacity:.72;transition:stroke .2s,stroke-width .2s,opacity .2s}
+.command-connections path.is-watch{stroke:#d6a15a;stroke-dasharray:6 7}
+.command-connections path.is-selected{stroke:#168d7b;stroke-width:3;opacity:1}
+.command-map-area[data-lens="Dependencias"] .command-connections path{stroke:#238b7b;stroke-width:2;opacity:.95}
+.command-map-area[data-lens="Riesgo"] .command-connections path.is-watch{stroke:#c77b64;stroke-width:3;opacity:1}
+.command-map-area[data-lens="Riesgo"] .command-connections path:not(.is-watch){stroke:#cddbd0;opacity:.48}
+.command-map-area[data-lens="Capacidad"] .command-connections path{opacity:.43}
+.command-core{position:relative;gap:4px;background:#10373a;border:9px solid white}
+.command-core:after{content:"";pointer-events:none;border:1px solid #7ba699a6;border-radius:50%;position:absolute;inset:9px}
+.command-core .command-core-symbol{color:#a9dccc;display:block;margin-bottom:3px}
+.command-core-symbol .command-glyph{width:29px;height:29px}
+.command-core strong{font-size:39px}
+.command-core small{font-size:8px;color:#bee4d6}
+.command-core-state{display:inline-block;background:#286c60;border:1px solid #5eac98;border-radius:14px;padding:5px 10px;font-size:8px!important;letter-spacing:.08em;color:#e4f8f0!important;margin-top:5px}
+.command-domain-strip button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px}
+.command-domain-strip .command-glyph{height:21px;width:21px;color:#497b72}
+.command-domain-strip button small{font-size:9px;line-height:1.2;margin:0;color:#258874}
+.command-domain-strip button small.is-watch{color:#b97f36}
+.command-decision>span{font-variant-numeric:tabular-nums}
+@media(max-width:720px){
+.command-map-area{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.command-domain{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-height:98px;padding:10px 9px}
+.command-domain-icon{display:none}
+.command-domain-column{gap:9px}
+.command-domain .command-domain-copy strong{font-size:10px}
+.command-domain .command-domain-copy small{font-size:9px}
+.command-domain .command-domain-copy .command-domain-state{font-size:9px}
+.command-domain-strip .command-glyph{width:18px;height:18px}
+.command-domain-strip button{padding:8px 2px}
+.command-domain-strip strong{font-size:9px}
+}
+@media(prefers-reduced-motion:reduce){.command-connections path{transition:none}}
