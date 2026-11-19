@@ -94,12 +94,46 @@ jobs:
               files:digests
             },null,2));
           "
-      - name: Publicar ZIP descargable de frontend validado
+      - name: Preparar distribución estática para el Worker público existente
+        if: success()
+        run: |
+          mkdir -p release/atlas-v5-public
+          cp -a dist release/atlas-v5-public/dist
+          cat > release/atlas-v5-public/wrangler.atlas-public.jsonc <<'EOF'
+          {
+            "name": "atlas-enterprise-it-operations-resilience",
+            "compatibility_date": "2026-11-18",
+            "assets": {
+              "directory": "./dist",
+              "run_worker_first": false,
+              "not_found_handling": "404-page"
+            }
+          }
+          EOF
+          cat > release/atlas-v5-public/LEEME-PUBLICAR.txt <<'EOF'
+          ATLAS V5 - FRONTEND ESTATICO APROBADO EN CI
+          Este paquete contiene la interfaz V5 y la gestion local.
+          No contiene Cloudflare Access ni D1 activos.
+          No permite colaboracion multiusuario real.
+
+          PUBLICACION MANUAL EN WORKER EXISTENTE:
+          1. Revisar el plan de Cloudflare y confirmar que no se generan cargos.
+          2. Extraer todo el paquete y entrar a esta carpeta.
+          3. Iniciar sesion: npx wrangler login
+          4. Publicar en Worker EXISTENTE: npx wrangler deploy --config wrangler.atlas-public.jsonc
+          5. Verificar en la URL habitual el titulo "Visibilidad para decidir."
+          6. Si hay incidentes, restaurar la version anterior desde el historial de despliegues de Cloudflare.
+
+          ADVERTENCIA: El paso 4 REEMPLAZA EL FRONTEND V4 PUBLICO.
+          Conserva los datos del navegador pero no migra/activa bases de datos.
+          Este archivo no es autorizacion para activar servicios pagos.
+          EOF
+      - name: Entregar ZIP listo para despliegue manual sin credenciales
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: atlas-v5-frontend-validado
-          path: dist/
+          name: atlas-v5-publicacion-frontend
+          path: release/atlas-v5-public/
           if-no-files-found: error
           retention-days: 30
       # Paquete sólo frontend; este workflow NO despliega ni crea recursos de Cloudflare.
