@@ -12,6 +12,7 @@ import {AccessError} from '../worker/auth.js';
 import {makeEmpty} from '../src/governance/core.js';
 
 const db=new DatabaseSync(':memory:');
+db.exec('PRAGMA foreign_keys=ON'); // D1 lo aplica automáticamente.
 for(const filename of ['0001_atlas_v5.sql','0002_atlas_v5_history.sql']){
   db.exec(await readFile(new URL('../migrations/'+filename,import.meta.url),'utf8'));
 }
