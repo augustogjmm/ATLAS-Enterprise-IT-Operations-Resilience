@@ -183,6 +183,7 @@ try{
 
  // Persistencia y exportación
  await page.reload({waitUntil:'networkidle'});
+  await page.locator('#workspace-tools').evaluate(el=>el.open=true);
  await page.locator('button[data-view="incidents"]').click();
  assert.equal(await page.locator('tr').filter({hasText:'CSV-E2E-01'}).count(),1);
  assert.equal(await page.locator('tr').filter({hasText:'CSV-E2E-02'}).count(),1);
