@@ -62,6 +62,8 @@ jobs:
         run: node scripts/v5-browser-smoke.mjs
       - name: "Probar V5 multiusuario: Worker, SQLite, concurrencia y revocación"
         run: node scripts/v5-multiuser-smoke.mjs
+      - name: "Probar V5: restauración aislada de backup SQLite"
+        run: node scripts/v5-recovery-drill.mjs
       - name: Guardar capturas de pantalla de revisión
         if: always()
         uses: actions/upload-artifact@v4
