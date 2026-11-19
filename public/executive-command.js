@@ -16,7 +16,7 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const d2=v=>String(v).padStart(2,'0');
 const pct=v=>Number.isFinite(v)?new Intl.NumberFormat('es-AR',{maximumFractionDigits:2,minimumFractionDigits:2}).format(v)+'%':'Sin datos';
 const empty='Sin datos';
-let lens='Panorama',selected='';
+let lens='Panorama',selected='',selectedDecision='';
 const lenses=['Panorama','Dependencias','Disponibilidad','Capacidad','Riesgo'];
 export function executiveModel(s){
  const isDemo=s.kind==='demo'||s.kind==='custom';
@@ -77,7 +77,10 @@ export function renderExecutiveCommand(s){
  kpis.map(([label,value],i)=>'<div class="command-kpi"><b>'+esc(value)+'</b><span>'+esc(label)+'</span><small>'+esc(i===0?'Calculado de registros':i===1?'Servicios de criticidad 1':i===2?'Pendientes':i===3?'Riesgos abiertos':'Incidentes sin resolver')+'</small></div>').join('')+'</section>'+
  '<section class="command-primary"><article class="command-map"><header class="command-map-head"><h2>Ecosistema tecnológico</h2><div class="command-lenses" role="group" aria-label="Perspectivas del ecosistema">'+
  lenses.map(x=>'<button type="button" data-command-lens="'+x+'" aria-pressed="'+(x===lens)+'" class="'+(x===lens?'on':'')+'">'+x+'</button>').join('')+'</div></header>'+
- '<div class="command-map-area" data-lens="'+esc(lens)+'"><div class="command-domain-column command-left">'+left.map(domainButton).join('')+'</div>'+
+ '<div class="command-map-area" data-lens="'+esc(lens)+'"><svg class="command-connections" viewBox="0 0 1000 460" preserveAspectRatio="none" aria-hidden="true">'+
+ [78,179,280,381].map(y=>'<path d="M 255 '+y+' C 392 '+y+', 387 230, 490 230" />').join('')+
+ [78,179,280,381].map(y=>'<path d="M 745 '+y+' C 608 '+y+', 613 230, 510 230" />').join('')+
+ '</svg><div class="command-domain-column command-left">'+left.map(domainButton).join('')+'</div>'+
  '<button type="button" data-command-ui="core" class="command-core" aria-label="Abrir detalle de Core"><small>NÚCLEO TECNOLÓGICO</small><strong>Core</strong><span>'+esc(pct(m.availability))+' DISP.</span></button>'+
  '<div class="command-domain-column command-right">'+right.map(domainButton).join('')+'</div></div>'+
  '<div class="command-map-foot"><span>● Con registros &nbsp; ● Seguimiento &nbsp; Perspectiva: <b>'+esc(lens)+'</b></span>'+
@@ -91,6 +94,17 @@ export function renderExecutiveCommand(s){
  (dec.length?dec.map((d,i)=>'<button type="button" class="command-decision" data-command-decision="'+esc(d.id)+'"><span>'+d2(i+1)+'</span><div><strong>'+esc(d.title)+'</strong>'+
  '<small>'+esc(d.owner||'Sin responsable')+' · '+esc(d.dueDate||'Sin fecha')+'</small><small>'+esc(m.activeRisks.find(r=>r.id===d.riskId)?.title||'Sin riesgo asociado')+'</small></div></button>').join(''):
  '<p class="command-empty">No hay decisiones pendientes registradas.</p>')+
+ (selectedDecision?(()=>{
+ const chosen=dec.find(d=>d.id===selectedDecision);
+ const risk=m.activeRisks.find(r=>r.id===chosen?.riskId);
+ return chosen?'<div class="command-decision-detail"><span class="command-eyebrow">DECISIÓN / DETALLE</span><h3>'+esc(chosen.title)+'</h3>'+
+ '<p>Responsable: '+esc(chosen.owner||'Sin asignar')+'</p><p>Fecha objetivo: '+esc(chosen.dueDate||'Sin fecha')+'</p>'+
+ '<p>Riesgo relacionado: '+esc(risk?.title||'Sin riesgo asociado')+'</p>'+
+ '<p>Impacto: '+esc(risk?.description||'No documentado')+'</p>'+
+ '<p>Recomendación: '+esc(risk?.treatment||'Consultar el plan de acción del registro')+'</p>'+
+ '<button class="command-detail-link" type="button" data-view="committee">Ver decisión en comité →</button>'+
+ '<button class="command-detail-link" type="button" data-command-ui="close">Cerrar detalle ×</button></div>':'';
+ })():'')+
  '<button type="button" class="command-decision-go" data-view="committee">Abrir plan de decisiones →</button></aside></section>'+
  '<section class="command-bottom"><article class="command-bottom-card"><h2>Pulso operativo</h2>'+
  (m.events.length?m.events.map(e=>'<div class="command-event"><time>'+esc(e.date||'—')+'</time><span>'+esc(e.text)+'</span></div>').join(''):
@@ -101,12 +115,12 @@ export function renderExecutiveCommand(s){
 }
 export function handleExecutiveCommand(event,s,rerender,openForm){
  const domain=event.target.closest('[data-command-domain]');
- if(domain){selected=selected===domain.dataset.commandDomain?'':domain.dataset.commandDomain;rerender();return true;}
+ if(domain){selectedDecision='';selected=selected===domain.dataset.commandDomain?'':domain.dataset.commandDomain;rerender();return true;}
  const perspective=event.target.closest('[data-command-lens]');
- if(perspective){lens=perspective.dataset.commandLens;selected='';rerender();return true;}
+ if(perspective){lens=perspective.dataset.commandLens;selected='';selectedDecision='';rerender();return true;}
  const action=event.target.closest('[data-command-ui]');
- if(action){selected=action.dataset.commandUi==='core'?'Core':'';rerender();return true;}
+ if(action){selected=action.dataset.commandUi==='core'?'Core':'';selectedDecision='';rerender();return true;}
  const decision=event.target.closest('[data-command-decision]');
- if(decision){openForm('view:committee');return true;}
+ if(decision){selectedDecision=selectedDecision===decision.dataset.commandDecision?'':decision.dataset.commandDecision;selected='';rerender();return true;}
  return false;
 }
