@@ -39,7 +39,7 @@ La organización del usuario debe existir y el correo debe estar preautorizado e
 | `auditor` | Sí | No | Sí | No |
 | `viewer` | Sí | No | No | No |
 
-Todos los permisos se verifican en el **servidor**, nunca solo en botones. Cada consulta SQL incluye un alcance explícito `tenant_id`; un UUID de workspace de otra organización siempre responde sin datos. Los miembros revocados pierden la autorización a nivel API. Nadie puede cambiar su propia membresía desde esta API.
+Todos los permisos se verifican en el **servidor**, nunca solo en botones. Cada consulta SQL incluye un alcance explícito `tenant_id`; un UUID de workspace de otra organización siempre responde sin datos. Los miembros revocados pierden la autorización a nivel API. Nadie puede cambiar su propia membresía desde esta API. La gestión de roles revalida la autoridad del actor y el rol real del destinatario en el SQL de escritura (no confía solo en la consulta inicial). La bitácora de cambios de acceso guarda el rol/estado previo y el nuevo usando una lectura transaccional, sin registrar operaciones denegadas.
 
 **Fuera de esta fase:** aprobadores independientes de riesgos, segregación por vertical o registro individual (ABAC), SSO corporativo real e integración de directorios. No afirmar que estos controles ya están implementados.
 
