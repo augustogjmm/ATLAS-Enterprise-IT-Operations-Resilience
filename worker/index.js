@@ -2,6 +2,7 @@ import {makeEmpty, assertValidState} from '../src/governance/core.js';
 import {ensurePerformanceState, validatePerformanceState} from '../src/governance/performance.js';
 import {ensureIncidentState, validateIncidentState} from '../src/governance/incidents.js';
 import {verifyAccessToken, AccessError} from './auth.js';
+import {validateGovernanceWorkflow,GovernanceRuleError} from './governance-rules.js';
 
 // API V5 aislada del frontend V4. No se publica ni conecta sin Access y D1.
 const MAX_WORKSPACES_PER_TENANT = 10; // Límite deliberado de la demo en plan gratuito.
@@ -44,7 +45,8 @@ function normalizeState(input) {
     ensureIncidentState(state);
     validatePerformanceState(state);
     validateIncidentState(state);
-  } catch (error) { throw new ApiError('Respaldo V4 inválido: ' + error.message); }
+    validateGovernanceWorkflow(state);
+  } catch (error) { throw new ApiError('Respaldo V4 inválido: ' + error.message,422); }
   return state;
 }
 async function readBody(request) {
@@ -186,8 +188,15 @@ export function createHandler({verify = verifyAccessToken} = {}) {
         const data=await readBody(request);
         const expected=data.revision;
         if (!Number.isSafeInteger(expected) || expected<1) throw new ApiError('Revisión esperada obligatoria');
-        await getWorkspace(db,tenantId,path[5]);
+        const current=await getWorkspace(db,tenantId,path[5]);
+        if(current.revision!==expected)
+          throw new ApiError('Conflicto de edición: el workspace ya tiene una revisión más reciente',409);
         const state=normalizeState(data.state);
+        try {validateGovernanceWorkflow(state,JSON.parse(current.state_json));}
+        catch(error) {
+          if(error instanceof GovernanceRuleError)throw new ApiError(error.message,422);
+          throw error;
+        }
         const now=new Date().toISOString(),newRevision=expected+1,auditId=crypto.randomUUID();
         // D1.batch ejecuta las instrucciones en una única transacción.
         // Verificar la revisión ANTES de actualizar evita auditar escrituras rechazadas.
