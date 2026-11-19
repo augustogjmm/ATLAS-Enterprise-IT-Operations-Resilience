@@ -1,5 +1,8 @@
 # ATLAS — Arquitectura y modelo de decisiones
 
+> **Alcance de este documento:** describe el **simulador de resiliencia**, que sigue disponible en `/simulador.html`. No es la arquitectura completa de ATLAS Governance V4 ni del backend V5. Para el flujo de gobierno actual consultar [Caso de estudio](CASE_STUDY.md), [Gobierno funcional](GOBIERNO_FUNCIONAL_V1.md) y [Estado de versiones](PROJECT_STATUS.md).
+
+
 > **Clasificación:** aplicación demostrativa con datos ficticios, sin información empresarial real.
 
 ## Objetivo
