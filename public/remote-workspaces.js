@@ -65,21 +65,31 @@ export class RemoteWorkspaces {
   }
   async exportAudit(tenantId){
     const events=[],seenIds=new Set(),seenCursors=new Set();
-    let cursor=null;
-    // El backend admite hasta 2.000 eventos globales, pero no descargar un archivo
-    // incompleto si una página falla o se repite un cursor.
+    let cursor=null,expectedCount=null;
+    // Una alteración de cantidad durante la paginación interrumpe el respaldo:
+    // no se entrega un JSON ambiguo ni parcial.
     for(let pageNumber=0;pageNumber<21;pageNumber++){
       const page=await this.auditPage(tenantId,cursor);
-      if(!Array.isArray(page?.events)||page.events.length>100)
+      if(!Array.isArray(page?.events)||page.events.length>100 ||
+        !Number.isSafeInteger(page.totalEvents)||page.totalEvents<0||page.totalEvents>2000)
         throw new RemoteWorkspaceError('Respuesta de auditoría inválida: se canceló la exportación.');
+      if(expectedCount===null)expectedCount=page.totalEvents;
+      else if(page.totalEvents!==expectedCount)
+        throw new RemoteWorkspaceError('La auditoría cambió durante la descarga. Reintentá cuando no haya escrituras.');
       for(const event of page.events){
         if(typeof event?.id!=='string'||seenIds.has(event.id))
           throw new RemoteWorkspaceError('La auditoría contiene eventos duplicados o inválidos. Exportación cancelada.');
         seenIds.add(event.id);events.push(event);
       }
       if(page.nextCursor===null){
+        if(events.length!==expectedCount)
+          throw new RemoteWorkspaceError('El total de auditoría no coincide con los eventos recuperados.');
+        const payload=JSON.stringify(events);
+        const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(payload));
+        const sha256=Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,'0')).join('');
         return {tenantId,exportedAt:new Date().toISOString(),eventCount:events.length,
-          notice:'Exportación paginada; las escrituras concurrentes pueden cambiar el conjunto durante la lectura.',
+          integrity:{algorithm:'SHA-256',encoding:'JSON.stringify(events)',sha256},
+          notice:'Integridad verificable del contenido; no equivale a firma digital ni a auditoría WORM.',
           events};
       }
       if(!page.nextCursor || !page.events.length)
