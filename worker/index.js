@@ -360,6 +360,27 @@ export function createHandler({verify = verifyAccessToken} = {}) {
         }
         return reply({id:path[5],revision:newRevision,restoredFrom:target,updatedAt:now});
       }
+      // Exportación paginada sin servicios adicionales ni pérdida de eventos antiguos.
+      // Cursor compuesto: orden estable incluso cuando dos eventos comparten timestamp.
+      if (resource==='audit' && path.length===6 && path[5]==='export' && request.method==='GET') {
+        requirePermission(member.role,'audit');
+        const params=new URL(request.url).searchParams;
+        const beforeAt=params.get('beforeAt'),beforeId=params.get('beforeId');
+        if ((beforeAt===null)!==(beforeId===null) ||
+          (beforeAt!==null && (!/^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d(?:\\.\\d+)?Z$/.test(beforeAt) ||
+            beforeId.length===0 || beforeId.length>100)))
+          throw new ApiError('Cursor de auditoría inválido',400);
+        const sql='SELECT id,workspace_id,actor_email,action,previous_revision,new_revision,metadata_json,occurred_at FROM atlas_audit_events WHERE tenant_id=?'+
+          (beforeAt===null?'':' AND (occurred_at < ? OR (occurred_at = ? AND id < ?))')+
+          ' ORDER BY occurred_at DESC,id DESC LIMIT 101';
+        const args=beforeAt===null?[tenantId]:[tenantId,beforeAt,beforeAt,beforeId];
+        const records=(await db.prepare(sql).bind(...args).all()).results;
+        const hasMore=records.length>100;
+        const page=records.slice(0,100);
+        const last=page.at(-1);
+        return reply({events:page.map(x=>({...x,metadata:JSON.parse(x.metadata_json),metadata_json:undefined})),
+          nextCursor:hasMore?{beforeAt:last.occurred_at,beforeId:last.id}:null});
+      }
       if (resource==='audit' && path.length===5 && request.method==='GET') {
         requirePermission(member.role,'audit');
         const events=await db.prepare(
