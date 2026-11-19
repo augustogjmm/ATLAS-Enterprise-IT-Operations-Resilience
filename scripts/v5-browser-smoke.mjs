@@ -46,9 +46,9 @@ try{
       else if(path==='/api/v1/tenants/'+tenant+'/audit/export'&&method==='GET'){
         if(!['owner','admin','auditor'].includes(role)){status=403;data={error:'Permiso insuficiente'};}
         else if(url.searchParams.has('beforeAt'))
-          data={events:[{id:'audit-1',actor_email:'owner@example.test',action:'workspace.created',occurred_at:'2026-11-17T12:00:00.000Z'}],nextCursor:null};
+          data={totalEvents:2,events:[{id:'audit-1',actor_email:'owner@example.test',action:'workspace.created',occurred_at:'2026-11-17T12:00:00.000Z'}],nextCursor:null};
         else
-          data={events:[{id:'audit-2',actor_email:'owner@example.test',action:'workspace.updated',occurred_at:'2026-11-18T12:00:00.000Z'}],
+          data={totalEvents:2,events:[{id:'audit-2',actor_email:'owner@example.test',action:'workspace.updated',occurred_at:'2026-11-18T12:00:00.000Z'}],
             nextCursor:{beforeAt:'2026-11-18T12:00:00.000Z',beforeId:'audit-2'}};
       }
       else if(path==='/api/v1/tenants/'+tenant+'/workspaces/'+id+'/revisions'&&method==='GET'){
@@ -171,6 +171,9 @@ try{
   assert.match(auditFile.suggestedFilename(),/^atlas-v5-auditoria-org-demo-.*\.json$/);
   const exported=JSON.parse(await (await import('node:fs/promises')).readFile(await auditFile.path(),'utf8'));
   assert.equal(exported.eventCount,2);
+  const {createHash}=await import('node:crypto');
+  assert.equal(exported.integrity.sha256,
+    createHash('sha256').update(JSON.stringify(exported.events)).digest('hex'));
   assert.deepEqual(exported.events.map(x=>x.id),['audit-2','audit-1']);
   assert.equal(owner.requests.filter(x=>x.path.endsWith('/audit/export')&&x.method==='GET').length,2);
   assert.equal(owner.requests.filter(x=>x.method==='PUT').length,0,'Exportar auditoría no escribe datos');
