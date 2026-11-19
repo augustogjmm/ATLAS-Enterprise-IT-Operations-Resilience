@@ -1,6 +1,7 @@
 -- ATLAS V5: base multiusuario aislada por organización (Cloudflare D1 / SQLite).
 -- No importar automáticamente datos locales ni crear organizaciones en producción.
-PRAGMA foreign_keys = ON;
+-- Cloudflare D1 aplica claves foráneas automáticamente. PRAGMA foreign_keys=ON está
+-- prohibido en D1; los ensayos con SQLite Node deben habilitarlo en sus fixtures.
 
 CREATE TABLE IF NOT EXISTS atlas_tenants (
   id TEXT PRIMARY KEY,
