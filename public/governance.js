@@ -11,6 +11,7 @@ import {incidentsView as renderIncidentsView} from './incidents-ui.js';
 import {inspectIncidentCSV,suggestColumnMapping,suggestServiceMap,suggestPriorityMap,uniqueMappedValues,parseMappedIncidentCSV} from './lib/governance/import-mapping.js';
 import {importWizardView} from './import-wizard-ui.js';
 import {mountRemoteV5} from './v5-ui.js';
+import {renderExecutiveCommand,handleExecutiveCommand} from './executive-command.js';
 
 const STORAGE_KEY='atlas-governance-workspace-v1';
 const today=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')};
@@ -35,7 +36,8 @@ const idFactory=prefix=>prefix+'-'+crypto.randomUUID();
 const viewMeta={
  performance:['KPI y OKR tecnológicos','Indicadores, objetivos, líneas base y resultados clave calculados'],
  incidents:['Incidentes y MTTR','Ingestión CSV, incidentes críticos, resolución y tendencias mensuales'],
- overview:['Visión ejecutiva','Alertas accionables y seguimiento de prioridades'],
+ overview:['Centro de gobierno tecnológico','Core, disponibilidad, riesgos y decisiones desde una perspectiva ejecutiva'],
+ operations:['Análisis operativo','Señales de riesgo, assessments, capacidad y seguimiento operativo'],
  verticals:['Verticales y equipos','Gobierno por dominio y responsables'],
  capacity:['Capacity management','Utilización, umbrales y proyección de tres meses'],
  assessments:['Assessments','Madurez, evidencias y brechas de las verticales'],
@@ -351,7 +353,7 @@ function render(){
  $('view-title').textContent=meta[0];$('view-subtitle').textContent=meta[1];
  $('breadcrumb-current').textContent=meta[0].toUpperCase();
  $('environment-label').textContent=state.kind==='demo'?'DATOS FICTICIOS DE DEMOSTRACIÓN':state.kind==='local'?'ESPACIO LOCAL SIN DATOS DE DEMOSTRACIÓN':'DATOS LOCALES EDITADOS · PUEDE CONTENER EJEMPLOS FICTICIOS';
- const pages={overview,performance:()=>renderPerformanceView(state,today(),{esc,mini,semaphore,empty,nfmt,fmtPct}),incidents:()=>renderIncidentsView(state,today(),{esc,mini,semaphore,empty,nfmt,fmtPct},incidentFilters),verticals:verticalsView,capacity:capacityView,assessments:assessmentsView,risks:risksView,actions:actionsView,continuity:continuityView,committee:committeeView};
+ const pages={overview:()=>renderExecutiveCommand(state),operations:overview,performance:()=>renderPerformanceView(state,today(),{esc,mini,semaphore,empty,nfmt,fmtPct}),incidents:()=>renderIncidentsView(state,today(),{esc,mini,semaphore,empty,nfmt,fmtPct},incidentFilters),verticals:verticalsView,capacity:capacityView,assessments:assessmentsView,risks:risksView,actions:actionsView,continuity:continuityView,committee:committeeView};
  $('view-root').innerHTML=(pages[view]||overview)();
  for(const node of document.querySelectorAll('[data-view]'))node.classList.toggle('selected',node.dataset.view===view);
  if(view==='incidents'&&importDraft)drawImportWizard();
@@ -477,6 +479,7 @@ function submitRecord(data){
 }
 function switchView(v){if(!viewMeta[v])return;view=v;render();$('main').focus({preventScroll:true});window.scrollTo({top:0,behavior:'instant'});}
 document.addEventListener('click',e=>{
+ if(view==='overview'&&handleExecutiveCommand(e,state,render,openForm))return;
  const nav=e.target.closest('[data-view]');if(nav){switchView(nav.dataset.view);return;}
  const item=e.target.closest('[data-open]');if(item){openForm(item.dataset.open,item.dataset.id||'');return;}
  const cmd=e.target.closest('[data-command]');if(!cmd)return;
