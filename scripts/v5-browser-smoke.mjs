@@ -171,10 +171,21 @@ try{
   assert.equal(await owner.page.locator('.command-lenses button').count(),5);
   await mkdir('test-artifacts',{recursive:true});
   await owner.page.locator('#workspace-tools').evaluate(el=>el.open=false);
+  await owner.page.waitForTimeout(4500); // Captura sin toast transitorio del flujo de apertura.
   await owner.page.screenshot({path:'test-artifacts/v5-command-1700.png',fullPage:true});
   await owner.page.setViewportSize({width:430,height:1600});
   await owner.page.screenshot({path:'test-artifacts/v5-command-430.png',fullPage:true});
   await owner.page.locator('#workspace-tools').evaluate(el=>el.open=true);
+  await owner.page.keyboard.press('Control+k');
+  await owner.page.locator('#atlas-search').waitFor({state:'visible'});
+  await owner.page.locator('#atlas-search-input').fill('Infraestructura');
+  await owner.page.locator('[data-shell-domain="Infraestructura"]').click();
+  await owner.page.locator('.command-inspector h3').getByText('Infraestructura').waitFor();
+  await owner.page.locator('[data-command-ui="close"]').click();
+  await owner.page.locator('#atlas-notifications-open').click();
+  await owner.page.locator('#atlas-notifications').waitFor({state:'visible'});
+  assert.ok((await owner.page.locator('#atlas-notifications-results').innerText()).includes('Riesgos abiertos'));
+  await owner.page.locator('#atlas-notifications [data-shell-close]').click();
   const mobileOverflow=await owner.page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1);
   assert.equal(mobileOverflow,false,'El command V5 no admite desbordamiento horizontal a 430 px');
   await owner.page.locator('[data-command-lens="Capacidad"]').click();
