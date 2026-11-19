@@ -396,7 +396,7 @@ test('API: rechaza null, listas y escalares con HTTP 400 en las cuatro rutas de 
     for(const [method,path] of paths){
       const response=await call('owner@a.test',method,path,payload);
       assert.equal(response.status,400,method+' '+path+' cuerpo '+JSON.stringify(payload));
-      assert.match(response.body.error,/objeto JSON/);
+      assert.equal(response.body.error,'El cuerpo JSON debe ser un objeto');
     }
   }
   assert.equal(sqlite.prepare('SELECT revision FROM atlas_workspaces WHERE id=?')
