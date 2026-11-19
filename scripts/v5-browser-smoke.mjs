@@ -100,10 +100,10 @@ try{
   assert.ok(await editor.page.locator('[data-workspace-command="backup"]').isVisible());
   const beforeVerify=editor.requests.filter(x=>x.method==='PUT').length;
   await editor.page.locator('[data-workspace-command="verify"]').click();
-  await editor.page.getByText('CAMBIOS SIN CONFIRMAR').waitFor();
+  await editor.page.waitForFunction(()=>document.querySelector('#workspace-panel')?.textContent?.includes('versión diferente'));
+  assert.ok(await editor.page.getByText('CAMBIOS SIN CONFIRMAR').isVisible());
   assert.equal(editor.requests.filter(x=>x.method==='PUT').length,beforeVerify,
     'Verificar una revisión diferente no debe reintentar el PUT');
-  assert.ok((await editor.page.locator('#workspace-panel').innerText()).includes('versión diferente'));
   assert.equal(await editor.page.evaluate(()=>localStorage.getItem('atlas-governance-workspace-v1')),localData);
   editor.page.once('dialog',d=>d.accept());
   await editor.page.locator('[data-workspace-command="local"]').click();
