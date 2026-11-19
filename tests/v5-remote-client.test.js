@@ -100,3 +100,38 @@ test('el cliente limpia el temporizador después de una respuesta válida',async
   assert.equal(signal.aborted,false,'El temporizador no debe dispararse después de finalizar');
   assert.throws(()=>new RemoteWorkspaces(async()=>Response.json({}),'/api/v1',0),RangeError);
 });
+
+test('exportación completa de auditoría recorre páginas, sin credenciales externas ni duplicados',async()=>{
+  const calls=[];
+  const api=new RemoteWorkspaces(async(url,options)=>{
+    calls.push({url,options});
+    const query=new URL(url,'https://atlas.test').searchParams;
+    const hasCursor=query.has('beforeAt');
+    return Response.json(hasCursor
+      ?{events:[{id:'evt-1',occurred_at:'2026-11-17T00:00:00.000Z'}],nextCursor:null}
+      :{events:[{id:'evt-2',occurred_at:'2026-11-18T00:00:00.000Z'}],
+        nextCursor:{beforeAt:'2026-11-18T00:00:00.000Z',beforeId:'evt-2'}});
+  });
+  const result=await api.exportAudit('org/a');
+  assert.equal(result.eventCount,2);
+  assert.deepEqual(result.events.map(x=>x.id),['evt-2','evt-1']);
+  assert.equal(result.tenantId,'org/a');
+  assert.equal(calls.length,2);
+  assert.equal(calls[0].url,'/api/v1/tenants/org%2Fa/audit/export');
+  assert.match(calls[1].url,/beforeAt=2026-11-18T00%3A00%3A00.000Z/);
+  assert.ok(calls.every(x=>x.options.credentials==='same-origin'&&x.options.method==='GET'));
+});
+
+test('exportación de auditoría no entrega resultados parciales ante fallo o repetición',async()=>{
+  let n=0;
+  const partial=new RemoteWorkspaces(async()=>{
+    n++;
+    if(n===2)return Response.json({error:'Auditoría no disponible'},{status:503});
+    return Response.json({events:[{id:'one'}],nextCursor:{beforeAt:'2026-11-18T00:00:00.000Z',beforeId:'one'}});
+  });
+  await assert.rejects(partial.exportAudit('org'),e=>e.status===503);
+  const duplicated=new RemoteWorkspaces(async()=>Response.json({
+    events:[{id:'one'}],nextCursor:{beforeAt:'2026-11-18T00:00:00.000Z',beforeId:'one'}
+  }));
+  await assert.rejects(duplicated.exportAudit('org'),/duplicados/);
+});
