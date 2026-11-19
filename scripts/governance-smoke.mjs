@@ -210,6 +210,8 @@ try{
  const mobile=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
  mobile.on('pageerror',error=>errors.push('mobile: '+error.message));
  await mobile.goto(url,{waitUntil:'networkidle'});
+ assert.equal(await mobile.locator('.command-domain').count(),8);
+ await mobile.locator('button[data-view="operations"]').click();
  assert.equal((await mobile.locator('.executive-kpi strong').allInnerTexts())[0],'1');
  assert.equal(await mobile.locator('.heatmap-cell').count(),25);
  await mobile.locator('button[data-view="incidents"]').click();
