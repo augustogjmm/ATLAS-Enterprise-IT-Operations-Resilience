@@ -26,6 +26,7 @@ test('Vista ejecutiva usa registros reales del workspace, no métricas de HTML',
  assert.equal(m.critical,s.services.filter(x=>x.criticality===1).length);
  assert.equal(m.pending.length,s.decisions.filter(x=>x.status==='pendiente').length);
  assert.equal(m.activeRisks.length,s.risks.filter(x=>x.status==='abierto').length);
+ assert.equal(m.priorityRisks.length,s.risks.filter(x=>x.status==='abierto'&&x.probability*x.impact>=9).length);
  assert.ok(m.availability>0 && m.availability<=100);
  const h=renderExecutiveCommand(s);
  assert.ok(h.includes('DATOS DEMOSTRATIVOS'));
