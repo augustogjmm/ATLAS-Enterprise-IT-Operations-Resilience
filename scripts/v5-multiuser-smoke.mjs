@@ -97,6 +97,7 @@ try{
     const page=await context.newPage();
     page.on('pageerror',e=>errors.push(email+': '+e.message));
     await page.goto(base,{waitUntil:'networkidle'});
+    await page.locator('#workspace-tools').evaluate(el=>el.open=true);
     const current={page,context,requests:()=>requests};sessions.push(current);
     assert.equal(current.requests(),0,'V4 no debe realizar llamadas API espontáneas');
     return current;
