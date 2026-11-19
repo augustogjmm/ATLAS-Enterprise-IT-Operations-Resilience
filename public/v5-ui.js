@@ -234,7 +234,7 @@ export function mountRemoteV5({getState,getLocal,replaceState,notice,validateSta
         }finally{setTimeout(()=>URL.revokeObjectURL(url),1500);}
         notice(result.eventCount+' eventos de auditoría exportados. Conservá el archivo en un lugar seguro.');
         s.details='<strong>Exportación de auditoría</strong><p>'+esc(result.eventCount)+
-          ' eventos descargados en JSON. La lectura es paginada y no representa un snapshot transaccional si se producen escrituras simultáneas. El archivo contiene identidades de usuarios: resguardalo y verificá su integridad antes de archivarlo.</p>';
+          ' eventos descargados en JSON, con control de cantidad entre páginas y huella SHA-256 de los eventos. SHA-256: <code>'+esc(result.integrity.sha256)+'</code>. El archivo incluye identidades personales: resguardalo. El hash detecta cambios accidentales pero no es una firma digital ni demuestra autenticidad frente a una alteración deliberada del archivo y su hash.</p>';
         return;
       }
       if(command==='audit'&&active()&&canAudit(s.role)){
