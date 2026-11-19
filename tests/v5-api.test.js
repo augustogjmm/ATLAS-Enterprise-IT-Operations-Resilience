@@ -354,6 +354,15 @@ test('membresías: promoción y revocación por owner son atómicas y quedan aud
   ).all('org-a');
   assert.equal(audits.length,2);
   assert.deepEqual(audits.map(x=>JSON.parse(x.metadata_json).status),['active','revoked']);
+  assert.deepEqual(audits.map(x=>({
+    previousRole:JSON.parse(x.metadata_json).previousRole,
+    previousStatus:JSON.parse(x.metadata_json).previousStatus,
+    role:JSON.parse(x.metadata_json).role,
+    status:JSON.parse(x.metadata_json).status
+  })),[
+    {previousRole:null,previousStatus:null,role:'admin',status:'active'},
+    {previousRole:'admin',previousStatus:'active',role:'admin',status:'revoked'}
+  ],'Cada evento debe guardar el estado anterior observado dentro de la transacción');
 });
 
 test('membresías: degradación concurrente de admin a viewer bloquea actualización existente',async()=>{
