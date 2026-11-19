@@ -31,7 +31,7 @@ Las cuotas son de la **cuenta completa**, no de ATLAS. Las limitaciones y precio
 4. El preflight de seguridad prohíbe credenciales, archivos de configuración de despliegue raíz y publicación automática.
 5. La preview automática de Cloudflare para la rama V5 sigue desactivada. Ninguno de estos controles crea servicios.
 
-**Acción al llegar al límite de auditoría:** detener operaciones de escritura y preservar todo el historial. Una futura solución gratuita de exportación integral, retención y archivo deberá aprobarse antes de volver a aceptar nuevas escrituras. El endpoint actual de auditoría muestra solamente los últimos 100 eventos por organización: **no constituye una exportación completa**. El tope garantiza un crecimiento acotado, no un archivo oficial inmutable ni continuidad de servicio.
+**Acción al llegar al límite de auditoría:** detener operaciones de escritura y preservar todo el historial. V5 ahora permite exportar los eventos paginados por organización y verificar su integridad mediante SHA-256; sigue sin disponer de un procedimiento oficial de archivo WORM ni de desbloqueo de escrituras tras el límite. El endpoint de vista rápida muestra solamente 100 eventos, pero `/audit/export` permite recuperar todas las páginas de esa organización. La exportación no es un backup integral de D1 ni una garantía de continuidad.
 
 **Límite del gate:** inspecciona una **plantilla**, no el estado de facturación. No puede demostrar por sí solo que un futuro despliegue costará USD 0. Si alguien sustituye la plantilla o configura servicios manualmente en Cloudflare, la CI no detectará automáticamente esa mutación externa. Se requiere verificación externa previa a activar cualquier recurso.
 
@@ -53,3 +53,15 @@ Las cuotas son de la **cuenta completa**, no de ATLAS. Las limitaciones y precio
 - V5 solo código en PR, sin URL de producto: https://github.com/augustogjmm/ATLAS-Enterprise-IT-Operations-Resilience/pull/8
 
 **Criterio de decisión:** si el proveedor exige pagar para cualquiera de las características imprescindibles, se debe simplificar la función o utilizar una alternativa gratuita. No hay excepción automática al presupuesto de USD 0.
+
+## Última lectura autorizada de la cuenta — 19/11/2026
+
+Consulta por API **exclusivamente GET**, sin crear recursos ni ejecutar despliegues:
+
+- D1 accesible: se encontró una base preexistente llamada `chamaquin-seg`; no tocarla ni reutilizarla.
+- Workers accesibles: se listaron cuatro scripts preexistentes; `atlas-enterprise-v5` no aparece.
+- `GET /accounts/{account_id}/subscriptions`: **HTTP 403**.
+- `GET /accounts/{account_id}/billing/usage`: **HTTP 403**.
+- `GET /accounts/{account_id}/access/apps`: **HTTP 403**.
+
+Un inventario accesible **no confirma** el plan Free, la capacidad efectiva de las cuotas ni la ausencia de cargos. Persisten los bloqueos de homologación. La evaluación lógica está en `scripts/v5-release-readiness.mjs`: exige evidencia explícita y aprobación del propietario, y no despliega nada.
