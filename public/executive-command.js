@@ -125,13 +125,27 @@ export function renderExecutiveCommand(s){
  '</div>';
 }
 export function handleExecutiveCommand(event,s,rerender,openForm){
+ const restoreFocus=selector=>{rerender();document.querySelector(selector)?.focus({preventScroll:true});};
  const domain=event.target.closest('[data-command-domain]');
- if(domain){selectedDecision='';selected=selected===domain.dataset.commandDomain?'':domain.dataset.commandDomain;rerender();return true;}
+ if(domain){
+  selectedDecision='';selected=selected===domain.dataset.commandDomain?'':domain.dataset.commandDomain;
+  const focused=[...document.querySelectorAll('.command-domain')].find(x=>x.dataset.commandDomain===selected);
+  restoreFocus(focused?'.command-domain[data-command-domain="'+CSS.escape(domain.dataset.commandDomain)+'"]':
+    '.command-core');
+  return true;
+ }
  const perspective=event.target.closest('[data-command-lens]');
- if(perspective){lens=perspective.dataset.commandLens;selected='';selectedDecision='';rerender();return true;}
+ if(perspective){
+  lens=perspective.dataset.commandLens;selected='';selectedDecision='';
+  restoreFocus('[data-command-lens="'+CSS.escape(lens)+'"]');return true;
+ }
  const action=event.target.closest('[data-command-ui]');
- if(action){selected=action.dataset.commandUi==='core'?'Core':'';selectedDecision='';rerender();return true;}
+ if(action){selected=action.dataset.commandUi==='core'?'Core':'';selectedDecision='';
+  restoreFocus('[data-command-ui="core"]');return true;}
  const decision=event.target.closest('[data-command-decision]');
- if(decision){selectedDecision=selectedDecision===decision.dataset.commandDecision?'':decision.dataset.commandDecision;selected='';rerender();return true;}
+ if(decision){
+  selectedDecision=selectedDecision===decision.dataset.commandDecision?'':decision.dataset.commandDecision;
+  selected='';restoreFocus('[data-command-decision="'+CSS.escape(decision.dataset.commandDecision)+'"]');return true;
+ }
  return false;
 }
