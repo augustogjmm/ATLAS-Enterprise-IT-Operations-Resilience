@@ -25,6 +25,7 @@ try{
  const page=await browser.newPage({viewport:{width:1440,height:900},acceptDownloads:true});
  page.on('pageerror',error=>errors.push('desktop: '+error.message));
  await page.goto(url,{waitUntil:'networkidle'});
+ await page.locator('#workspace-tools').evaluate(el=>el.open=true);
  assert.match(await page.title(),/Gobierno/);
  assert.match(await page.locator('.command-hero h1').innerText(),/Visibilidad para decidir/i);
  assert.equal(await page.locator('.command-domain').count(),8);
@@ -210,6 +211,7 @@ try{
  const mobile=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
  mobile.on('pageerror',error=>errors.push('mobile: '+error.message));
  await mobile.goto(url,{waitUntil:'networkidle'});
+ await mobile.locator('#workspace-tools').evaluate(el=>el.open=true);
  assert.equal(await mobile.locator('.command-domain').count(),8);
  await mobile.locator('button[data-view="operations"]').click();
  assert.equal((await mobile.locator('.executive-kpi strong').allInnerTexts())[0],'1');
