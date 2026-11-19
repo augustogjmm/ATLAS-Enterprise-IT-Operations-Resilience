@@ -220,3 +220,32 @@ test('gobierno de costos: máximo diez workspaces por organización, rechazo sin
   assert.equal((await call('owner@b.test','POST','/api/v1/tenants/org-b/workspaces',{name:'Independiente'})).status,201);
   assert.equal((await call('viewer@a.test','GET',base)).status,200);
 });
+
+test('servidor V5: JSON no puede fabricar cierres de riesgos ni alterar evidencias finalizadas',async()=>{
+  const {call,sqlite}=fixture();
+  const root='/api/v1/tenants/org-a/workspaces';
+  const state=makeEmpty();
+  state.verticals.push({id:'v1',name:'Operaciones',owner:'IT',description:''});
+  state.risks.push({id:'r1',verticalId:'v1',serviceId:'',assessmentId:'',capacityId:'',title:'Riesgo',
+    description:'',owner:'IT',probability:4,impact:5,status:'abierto',evidence:'',source:'manual',createdAt:'2026-11-18'});
+  state.actions.push({id:'a1',riskId:'r1',title:'Corregir',owner:'IT',dueDate:'2026-12-01',
+    status:'pendiente',evidence:'',createdAt:'2026-11-18'});
+  const created=await call('owner@a.test','POST',root,{name:'Políticas',state});
+  assert.equal(created.status,201);
+  const endpoint=root+'/'+created.body.id;
+  const forged=structuredClone(state);forged.risks[0].status='validado';forged.risks[0].evidence='Evidencia ficticia';forged.risks[0].validatedAt='2026-11-18';
+  const forbidden=await call('editor@a.test','PUT',endpoint,{revision:1,state:forged});
+  assert.equal(forbidden.status,422);
+  assert.equal((await call('viewer@a.test','GET',endpoint)).body.revision,1);
+  assert.equal(sqlite.prepare('SELECT count(*) AS n FROM atlas_audit_events').get().n,1);
+  const completed=structuredClone(state);
+  completed.actions[0].status='completada';completed.actions[0].evidence='Evidencia de tarea concluida';completed.actions[0].completedAt='2026-11-18';
+  assert.equal((await call('editor@a.test','PUT',endpoint,{revision:1,state:completed})).status,200);
+  completed.risks[0].status='validado';completed.risks[0].evidence='Evidencia de mitigación verificada';
+  completed.risks[0].validatedAt='2026-11-18';
+  assert.equal((await call('editor@a.test','PUT',endpoint,{revision:2,state:completed})).status,200);
+  const altered=structuredClone(completed);altered.actions[0].evidence='Cierre alterado';
+  assert.equal((await call('admin@a.test','PUT',endpoint,{revision:3,state:altered})).status,422);
+  assert.equal((await call('viewer@a.test','GET',endpoint)).body.revision,3);
+  assert.equal(sqlite.prepare('SELECT count(*) AS n FROM atlas_audit_events').get().n,3);
+});
