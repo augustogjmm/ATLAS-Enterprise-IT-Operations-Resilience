@@ -33,6 +33,7 @@ Ejecutar en la rama V5 (Node >=22):
 
 ```sh
 npm run check
+node scripts/v5-release-preflight.mjs
 npm test
 npm run build
 # Ejecutables tras instalar Playwright para CI, según quality.yml:
@@ -41,6 +42,10 @@ node scripts/governance-smoke.mjs
 node scripts/v5-browser-smoke.mjs
 node scripts/v5-multiuser-smoke.mjs
 ```
+
+**Seguridad de identidad sin recursos externos:** `tests/v5-signed-access-api.test.js` emite JWT RS256 firmados con claves efímeras, implementa en memoria un endpoint JWKS de prueba y conecta el verificador criptográfico con la API real. Verifica también suplantación, audiencias incorrectas, expiración y revocación. Ningún JWT de prueba es válido para un servicio real.
+
+**Bloqueo de despliegues inadvertidos:** `scripts/v5-release-preflight.mjs` es parte obligatoria de la CI. Detecta archivos `.dev.vars` / `.env` versionados, configuración de despliegue raíz y comandos de publicación en scripts o workflows. La plantilla V5 conserva placeholders sin credenciales. Cuando se autorice crear infraestructura aislada, cambiar el gate explícitamente en un PR distinto sujeto a revisión.
 
 La última prueba utiliza el **Worker real importado**, migraciones SQL aplicadas sobre SQLite en memoria y **tres contextos independientes** de Chromium, con identidades sintéticas inyectadas **solo por el test**. Verifica owner/editor/viewer, conflicto de guardado, reconciliación, exportación de respaldo, restauración y revocación. No hay D1 remota ni credenciales reales.
 
