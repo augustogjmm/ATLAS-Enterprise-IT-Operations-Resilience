@@ -56,6 +56,41 @@ export class RemoteWorkspaces {
       {method:'PUT',body:{revision:currentRevision}});
   }
   audit(tenantId){return this.request('/tenants/'+segment(tenantId)+'/audit');}
+  auditPage(tenantId,cursor=null){
+    const base='/tenants/'+segment(tenantId)+'/audit/export';
+    if(cursor===null)return this.request(base);
+    if(!cursor || typeof cursor.beforeAt!=='string' || typeof cursor.beforeId!=='string')
+      throw new RemoteWorkspaceError('Cursor de auditoría inválido');
+    return this.request(base+'?beforeAt='+segment(cursor.beforeAt)+'&beforeId='+segment(cursor.beforeId));
+  }
+  async exportAudit(tenantId){
+    const events=[],seenIds=new Set(),seenCursors=new Set();
+    let cursor=null;
+    // El backend admite hasta 2.000 eventos globales, pero no descargar un archivo
+    // incompleto si una página falla o se repite un cursor.
+    for(let pageNumber=0;pageNumber<21;pageNumber++){
+      const page=await this.auditPage(tenantId,cursor);
+      if(!Array.isArray(page?.events)||page.events.length>100)
+        throw new RemoteWorkspaceError('Respuesta de auditoría inválida: se canceló la exportación.');
+      for(const event of page.events){
+        if(typeof event?.id!=='string'||seenIds.has(event.id))
+          throw new RemoteWorkspaceError('La auditoría contiene eventos duplicados o inválidos. Exportación cancelada.');
+        seenIds.add(event.id);events.push(event);
+      }
+      if(page.nextCursor===null){
+        return {tenantId,exportedAt:new Date().toISOString(),eventCount:events.length,
+          notice:'Exportación paginada; las escrituras concurrentes pueden cambiar el conjunto durante la lectura.',
+          events};
+      }
+      if(!page.nextCursor || !page.events.length)
+        throw new RemoteWorkspaceError('Paginación de auditoría incompleta.');
+      const key=JSON.stringify(page.nextCursor);
+      if(seenCursors.has(key))throw new RemoteWorkspaceError('Cursor de auditoría repetido.');
+      seenCursors.add(key);cursor=page.nextCursor;
+    }
+    throw new RemoteWorkspaceError('Exportación interrumpida: exceso de páginas de auditoría.');
+  }
+
   members(tenantId){return this.request('/tenants/'+segment(tenantId)+'/members');}
   setMember(tenantId,email,role,status){
     return this.request('/tenants/'+segment(tenantId)+'/members/'+segment(email),{method:'PUT',body:{role,status}});
