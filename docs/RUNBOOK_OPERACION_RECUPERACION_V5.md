@@ -71,7 +71,8 @@ SELECT tenant_id, workspace_id, COUNT(*) AS revisiones
   FROM atlas_workspace_revisions GROUP BY tenant_id, workspace_id;
 SELECT tenant_id, action, COUNT(*) AS eventos
   FROM atlas_audit_events GROUP BY tenant_id, action ORDER BY tenant_id, action;
-PRAGMA foreign_key_check;
+-- En D1, comprobar restricciones FK con pruebas controladas de INSERT rechazado;
+-- varios PRAGMA de integridad están restringidos a diferencia de SQLite local.
 ```
 
 La tabla de revisiones deberá conservar como máximo 5 entradas por workspace. Si se detectan errores de integridad, suspender cambios y no ejecutar restauraciones automatizadas.
@@ -84,7 +85,7 @@ La tabla de revisiones deberá conservar como máximo 5 entradas por workspace. 
 
 **Restauración de un workspace:** `owner` o `admin` selecciona una de las últimas 5 versiones, confirma el riesgo de sobrescritura y ejecuta la restauración. El servidor exige la revisión actual y registra `workspace.restored`, autor, revisión anterior, origen y nueva revisión; no borra el historial de auditoría.
 
-**Restauración ante corrupción de D1:** no escribir sobre el entorno original hasta tener copia y diagnóstico. Restaurar **en un ambiente separado**, ejecutar `PRAGMA foreign_key_check`, comparar conteos y datos sintéticos, probar roles y JWT y habilitar tráfico solo tras aprobación. Si se sospecha compromiso de identidad, revocar el acceso antes de recuperar datos.
+**Restauración ante corrupción de D1:** no escribir sobre el entorno original hasta tener copia y diagnóstico. Restaurar **en un ambiente separado**, ejecutar los controles de integridad compatibles con el entorno (en SQLite nativo, `PRAGMA integrity_check` y `PRAGMA foreign_key_check`; en D1, consultas permitidas y comprobación de restricciones), comparar conteos y datos sintéticos, probar roles y JWT y habilitar tráfico solo tras aprobación. Si se sospecha compromiso de identidad, revocar el acceso antes de recuperar datos.
 
 ## 6. Casos de incidentes operativos
 
