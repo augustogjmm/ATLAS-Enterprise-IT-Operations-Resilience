@@ -5,7 +5,7 @@
 ## 1. Alcance y límites
 
 - Servicio propuesto: **un Worker V5 independiente**, D1 propia `atlas-v5`, Cloudflare Access limitado a usuarios preautorizados; **no reutilizar** la base `chamaquin-seg` ni modificar el Worker de V4.
-- Acceso por `owner`, `admin`, `editor`, `auditor`, `viewer`. Las reglas efectivas se validan **en el Worker**, no en los controles visuales.
+- Acceso por `owner`, `admin`, `editor`, `auditor`, `viewer`. Las reglas efectivas se validan **en el Worker**, no en los controles visuales. Ante un cambio de membresía, el backend vuelve a comprobar privilegios dentro de D1 y registra el rol/estado anterior y el posterior en el mismo lote; la bitácora sigue sin ser WORM.
 - Persistencia del workspace mediante revisiones optimistas; escritura concurrente rechazada con HTTP 409; historial acotado a 5 versiones, con restauración autorizada como revisión nueva.
 - Límite deliberado de **10 workspaces por organización**; tamaño máximo **1 MiB de JSON por escritura**. Son topes de aplicación, no límites garantizados del plan Cloudflare.
 - **No utilizar datos confidenciales, personales ni bancarios**. Las pruebas con SQLite y navegadores locales no equivalen a validar el runtime Cloudflare ni Cloudflare Access real.
@@ -102,6 +102,7 @@ La tabla de revisiones deberá conservar como máximo 5 entradas por workspace. 
 | Acceso revocado durante una escritura | El Worker vuelve a verificar permisos en SQL; ante HTTP 403 conservar y exportar cambios locales, contactar a un `owner` sin intentar eludir los controles |
 | Restauración no confirmada | Evitar reintentar a ciegas; consultar la revisión actual y auditoría |
 | Pérdida de propietario | Recuperación de membresía mediante procedimiento administrativo auditado; no crear bypass en frontend |
+| Promoción o revocación denegada | Verificar quién tiene el rol `owner` y el rol efectivo del destinatario. Una promoción concurrente del destinatario o revocación del administrador invalida la solicitud; no eludir la verificación con SQL manual |
 
 ## 7. Rollback y gobierno de cambios
 
