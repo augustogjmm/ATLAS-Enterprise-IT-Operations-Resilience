@@ -87,5 +87,5 @@ test('Access: rotación JWKS actualiza clave desconocida y limita solicitudes co
   const attacker=await jwt(second,'kid-inexistente');
   await assert.rejects(verifyAccessToken(req(attacker),env,fetcher),AccessError);
   await assert.rejects(verifyAccessToken(req(attacker),env,fetcher),AccessError);
-  assert.equal(calls,3,'Refrescar una sola vez ante múltiples kids desconocidos');
+  assert.equal(calls,2,'Tras una rotación se respeta el backoff de 30 s ante kids inválidos');
 });
