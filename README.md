@@ -14,7 +14,7 @@ La rama V5 incorpora una API con membresías multi-tenant, roles (`owner`, `admi
 
 El modo local sigue siendo el predeterminado y conserva su `localStorage`. Abrir un workspace remoto **no sobrescribe los registros V4 locales**. Copiar un respaldo local al servidor exige confirmaciones expresas. Sin la configuración autenticada de Access y D1, el modo remoto falla cerrado y la V4 local permanece disponible.
 
-**Validación:** la CI ejecuta tests de negocio, identidad, RBAC, aislamiento multi-tenant y Chromium con API remota simulada; **no demuestra todavía un despliegue real con Cloudflare Access+D1**. Ver [arquitectura, controles y condiciones de activación de V5](docs/ARQUITECTURA_ATLAS_V5.md).
+**Validación:** la CI ejecuta pruebas de negocio, identidad, RBAC, aislamiento multi-tenant y Chromium. Además del mock visual, existe una **prueba multiusuario de punta a punta** que conecta la interfaz real con el Worker real y SQLite en memoria, simulando el enlace D1 y autenticando cuentas sintéticas exclusivamente desde el test. El Worker verifica también cierres de acciones, riesgos, decisiones y objetivos y protege la inmutabilidad de registros finalizados. **Esto NO equivale a un despliegue real ni a una prueba de Cloudflare Access+D1.** Ver [arquitectura y controles V5](docs/ARQUITECTURA_ATLAS_V5.md) y [guía operativa de respaldo, homologación y rollback](docs/RUNBOOK_OPERACION_RECUPERACION_V5.md).
 
 ## ¿Qué podés hacer?
 
@@ -107,6 +107,9 @@ Los KPI disponibles son un **catálogo acotado de mediciones calculables**, no u
 La siguiente evolución prevista es D1 + autenticación + control por roles, previo diseño de seguridad y validación de cuotas del plan gratuito. Quedan pendientes conectores ITSM productivos, mapeo de formatos de terceros, KPI por vertical y auditoría de origen. No se declaran implementados.
 
 ## Documentación
+
+- [Operación, respaldos, recuperación y liberación segura de V5](docs/RUNBOOK_OPERACION_RECUPERACION_V5.md)
+- [Arquitectura multiusuario y gobierno V5](docs/ARQUITECTURA_ATLAS_V5.md)
 
 - [Modelo y criterios del primer circuito funcional](docs/GOBIERNO_FUNCIONAL_V1.md)\n- [Definiciones y metodología KPI/OKR](docs/KPI_OKR_METODOLOGIA.md)
 - [Importación ITSM, CSV y metodología MTTR](docs/INCIDENTES_MTTR_CSV.md)
