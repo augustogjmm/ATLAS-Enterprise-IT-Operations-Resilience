@@ -477,7 +477,7 @@ test('identidad: revocación tras SELECT inicial no fija access_sub ni permite l
 test('identidad: organización inactivada durante el bind impide acceso y cambio de sujeto',async()=>{
   const {call,sqlite,afterMembershipLookup}=fixture();
   afterMembershipLookup(db=>db.prepare(
-    "UPDATE atlas_tenants SET status='inactive' WHERE id=?"
+    "UPDATE atlas_tenants SET status='suspended' WHERE id=?"
   ).run('org-a'));
   const response=await call('viewer@a.test','GET','/api/v1/tenants/org-a/workspaces');
   assert.equal(response.status,403);
