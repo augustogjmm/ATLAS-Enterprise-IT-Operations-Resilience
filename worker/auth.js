@@ -16,8 +16,13 @@ function decodeBase64Url(value) {
   return Uint8Array.from(bytes, character => character.charCodeAt(0));
 }
 function decodeJson(value) {
-  try { return JSON.parse(decoder.decode(decodeBase64Url(value))); }
-  catch { throw new AccessError(); }
+  try {
+    const parsed=JSON.parse(decoder.decode(decodeBase64Url(value)));
+    // Incluso un JWT firmado puede tener JSON null/array/escalar: fail-closed con 401.
+    if(!parsed || typeof parsed!=='object' || Array.isArray(parsed))
+      throw new AccessError();
+    return parsed;
+  } catch { throw new AccessError(); }
 }
 function teamOrigin(env) {
   try {
@@ -65,12 +70,12 @@ export async function verifyAccessToken(request, env, fetcher = fetch) {
   if (header.alg !== 'RS256' || typeof header.kid !== 'string' ||
       header.kid.length<1 || header.kid.length>128) throw new AccessError();
   let keys = await keysFor(issuer, fetcher);
-  let jwk = keys.find(k => k.kid === header.kid && k.kty === 'RSA' &&
+  let jwk = keys.find(k => k && typeof k==='object' && k.kid === header.kid && k.kty === 'RSA' &&
     (!k.alg || k.alg==='RS256'));
   if (!jwk) {
     // Cloudflare puede rotar sus claves antes del vencimiento del caché.
     keys=await keysFor(issuer,fetcher,true);
-    jwk=keys.find(k=>k.kid===header.kid&&k.kty==='RSA'&&(!k.alg||k.alg==='RS256'));
+    jwk=keys.find(k=>k&&typeof k==='object'&&k.kid===header.kid&&k.kty==='RSA'&&(!k.alg||k.alg==='RS256'));
   }
   if (!jwk) throw new AccessError();
   try {

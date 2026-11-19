@@ -13,7 +13,8 @@ test('JWT Cloudflare Access: firma RS256, issuer, audience y vencimiento',async(
   jwk.kid='test-2026-11';
   const fetcher=async url=>{
     assert.equal(url,origin+'/cdn-cgi/access/certs');
-    return new Response(JSON.stringify({keys:[jwk]}),{status:200,headers:{'content-type':'application/json'}});
+    // Se ignoran entradas JWKS corruptas, sin omitir la validación de firma RSA.
+    return new Response(JSON.stringify({keys:[null,jwk]}),{status:200,headers:{'content-type':'application/json'}});
   };
   const base={
     iss:origin,aud,sub:'access-user-123',email:'Director@Example.com',
@@ -40,6 +41,11 @@ test('JWT Cloudflare Access: firma RS256, issuer, audience y vencimiento',async(
   await assert.rejects(verifyAccessToken(req(await token(base,{alg:'none',kid:jwk.kid})),env,fetcher),AccessError);
   await assert.rejects(verifyAccessToken(new Request('https://app.example/api/v1/session'),env,fetcher),AccessError);
   await assert.rejects(verifyAccessToken(req(valid),{ACCESS_TEAM_DOMAIN:'',ACCESS_AUD:aud},fetcher),AccessError);
+  // JSON válido pero incompatible con JWT: no permitir 500 por TypeError.
+  for(const invalidShape of [null,[],42,'texto']){
+    await assert.rejects(verifyAccessToken(req(await token(base,invalidShape)),env,fetcher),AccessError);
+    await assert.rejects(verifyAccessToken(req(await token(invalidShape)),env,fetcher),AccessError);
+  }
   for(const invalid of [
     {...base,iat:'0'}, {...base,iat:base.exp+500},
     {...base,exp:String(base.exp)}, {...base,nbf:'0'},
