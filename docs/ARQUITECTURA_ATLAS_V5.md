@@ -72,6 +72,7 @@ La edición exige `revision`. Dos editores que intenten modificar la misma revis
 | GET | `/tenants/:tenant/workspaces/:id/revisions` | Historial de hasta cinco revisiones (auditor, admin, owner) |
 | PUT | `/tenants/:tenant/workspaces/:id/revisions/:revision/restore` | Restauración auditable como nueva revisión (owner/admin) |
 | GET | `/tenants/:tenant/audit` | Bitácora solo para roles autorizados |
+| GET | `/tenants/:tenant/audit/export` | Exportación paginada de toda la auditoría por cursor (`beforeAt`, `beforeId`), hasta 100 eventos por página, roles owner/admin/auditor |
 | GET | `/tenants/:tenant/members` | Directorio controlado |
 | PUT | `/tenants/:tenant/members/:email` | Alta, cambio de rol o revocación por usuario privilegiado |
 
