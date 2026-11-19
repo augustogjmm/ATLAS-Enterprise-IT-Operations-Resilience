@@ -7,6 +7,7 @@ import {makeEmpty} from '../src/governance/core.js';
 
 function fixture() {
   const sqlite = new DatabaseSync(':memory:');
+  sqlite.exec('PRAGMA foreign_keys=ON'); // Simula enforcement obligatorio de D1.
   sqlite.exec(readFileSync(new URL('../migrations/0001_atlas_v5.sql', import.meta.url), 'utf8'));
   sqlite.exec(readFileSync(new URL('../migrations/0002_atlas_v5_history.sql', import.meta.url), 'utf8'));
   const stamp='2026-11-18T00:00:00.000Z';
