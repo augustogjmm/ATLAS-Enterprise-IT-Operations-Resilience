@@ -79,6 +79,8 @@ La tabla de revisiones deberá conservar como máximo 5 entradas por workspace. 
 
 ## 5. Respaldo y restauración
 
+**Protección de cambios no confirmados:** ATLAS ofrece una acción de conciliación solo lectura y una advertencia de salida. La copia pendiente existe solamente en la memoria de la pestaña. Para preservar ese contenido ante cierre del navegador, descargar manualmente el JSON antes de salir. La comparación exitosa confirma el estado pero no significa que una pérdida de red haya registrado dos operaciones.
+
 **Respaldo individual del usuario:** seleccionar un workspace y descargar **Exportar respaldo** en JSON. Este archivo puede contener toda la información del workspace: tratarlo como sensible, guardar en lugar autorizado y no subirlo a un repositorio público. Si hay conflicto 409 o falla de red, descargar **Exportar cambios** *antes* de recargar o volver a V4 local. El respaldo del navegador no sustituye al backup completo de D1.
 
 **Respaldo de base:** antes de toda migración o liberación, un administrador deberá usar la función oficial de exportación/backup disponible en D1 según el plan y la documentación vigente. Registrar fecha, base, ambiente, integridad, responsable y lugar protegido. Verificar que se incluyan `atlas_tenants`, `atlas_memberships`, `atlas_workspaces`, `atlas_workspace_revisions` y `atlas_audit_events`; no publicar el archivo.
@@ -92,10 +94,12 @@ La tabla de revisiones deberá conservar como máximo 5 entradas por workspace. 
 | Síntoma | Acción segura |
 |---|---|
 | Access 401/403 | Comprobar equipo/audiencia, política, JWT, membresía y su asociación `access_sub`; no desactivar Access |
-| HTTP 409 | Exportar cambios no confirmados; consultar la nueva revisión y reconciliar manualmente |
+| HTTP 409 | Usar «Verificar guardado en servidor». Si los datos remotos difieren, exportar cambios no confirmados y reconciliar manualmente; no repetir el PUT automáticamente |
 | HTTP 422 | Revisar evidencia y reglas de cierre; no forzar escritura directa en SQL |
 | HTTP 429 | Se alcanzó el cupo de workspaces; revisar capacidad antes de cambiar el límite |
 | HTTP 503 | D1 o configuración de Access no disponible; mantener V4 local como alternativa |
+| Respuesta perdida después del PUT | Leer revisión actual con «Verificar guardado en servidor»; el servidor podría haber aplicado la operación. Si el estado coincide, continuar sin duplicarla; si difiere, exportar y resolver el conflicto |
+| Acceso revocado durante una escritura | El Worker vuelve a verificar permisos en SQL; ante HTTP 403 conservar y exportar cambios locales, contactar a un `owner` sin intentar eludir los controles |
 | Restauración no confirmada | Evitar reintentar a ciegas; consultar la revisión actual y auditoría |
 | Pérdida de propietario | Recuperación de membresía mediante procedimiento administrativo auditado; no crear bypass en frontend |
 
