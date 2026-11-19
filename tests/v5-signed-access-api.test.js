@@ -8,6 +8,7 @@ import {createHandler} from '../worker/index.js';
 import {verifyAccessToken} from '../worker/auth.js';
 import {makeEmpty} from '../src/governance/core.js';
 
+let fixtureSequence=0;
 async function setup() {
   const sqlite=new DatabaseSync(':memory:');
   for(const migration of ['0001_atlas_v5.sql','0002_atlas_v5_history.sql']){
@@ -28,7 +29,8 @@ async function setup() {
   },true,['sign','verify']);
   const jwk=await crypto.subtle.exportKey('jwk',rsa.publicKey);
   jwk.kid='atlas-v5-signed-integration-key';
-  const origin='https://atlas-v5-integration.cloudflareaccess.com';
+  // Cada fixture usa un emisor propio: la caché de JWK es global y está indexada por origen.
+  const origin='https://atlas-v5-integration-'+(++fixtureSequence)+'.cloudflareaccess.com';
   const aud='atlas-v5-test-only-audience';
   const env={ACCESS_TEAM_DOMAIN:origin,ACCESS_AUD:aud};
   const fakeJwks=async url=>{
