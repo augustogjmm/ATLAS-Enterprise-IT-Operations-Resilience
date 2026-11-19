@@ -114,9 +114,16 @@ try{
     {role:'admin',status:'revoked'})).status,200);
   assert.equal((await call('test-member@a.test','GET',root)).status,403);
   const membershipAudits=await db.prepare(
-    "SELECT COUNT(*) AS n FROM atlas_audit_events WHERE tenant_id=? AND action='membership.changed'"
-  ).bind('org-a').first();
-  assert.equal(membershipAudits.n,3);
+    "SELECT metadata_json FROM atlas_audit_events WHERE tenant_id=? AND action='membership.changed'"
+  ).bind('org-a').all();
+  assert.equal(membershipAudits.results.length,3);
+  const transitions=membershipAudits.results.map(x=>{
+    const m=JSON.parse(x.metadata_json);
+    return [m.previousRole,m.previousStatus,m.role,m.status];
+  });
+  assert.ok(transitions.some(x=>JSON.stringify(x)===JSON.stringify([null,null,'viewer','active'])));
+  assert.ok(transitions.some(x=>JSON.stringify(x)===JSON.stringify(['viewer','active','admin','active'])));
+  assert.ok(transitions.some(x=>JSON.stringify(x)===JSON.stringify(['admin','active','admin','revoked'])));
   assert.equal((await db.prepare("SELECT count(*) AS n FROM sqlite_master WHERE type='table' AND name LIKE 'atlas_%'").first()).n,5);
 
   // D1.batch debe abortar toda la transacción si una sentencia falla.
