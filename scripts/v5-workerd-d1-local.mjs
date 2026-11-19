@@ -30,8 +30,12 @@ const mf=new Miniflare({
 });
 try{
   const db=await mf.getD1Database('ATLAS_DB');
-  for(const name of ['0001_atlas_v5.sql','0002_atlas_v5_history.sql'])
-    await db.exec(await readFile(new URL('../migrations/'+name,import.meta.url),'utf8'));
+  for(const name of ['0001_atlas_v5.sql','0002_atlas_v5_history.sql']){
+    // D1.exec local separa sentencias por línea y no acepta líneas de comentario como SQL.
+    const sql=(await readFile(new URL('../migrations/'+name,import.meta.url),'utf8'))
+      .split('\n').filter(line=>!line.trimStart().startsWith('--')).join('\n');
+    await db.exec(sql);
+  }
   assert.equal((await db.prepare('PRAGMA integrity_check').first()).integrity_check,'ok');
   const stamp='2026-11-18T00:00:00.000Z';
   for(const [id,name] of [['org-a','Empresa A'],['org-b','Empresa B']])
