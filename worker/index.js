@@ -117,6 +117,19 @@ async function requireStillAllowed(db,tenantId,identity,permission){
     throw new ApiError('Acceso revocado o permisos modificados durante la operación',403);
 }
 
+// Gestión de membresías: control de privilegios efectuado en el mismo SQL de escritura.
+// El guard compara el rol ACTUAL del actor y del destinatario (no un snapshot anterior).
+const memberChangeGuard =
+  "EXISTS(SELECT 1 FROM atlas_memberships actor JOIN atlas_tenants tenant ON tenant.id=actor.tenant_id "+
+  "WHERE actor.tenant_id=? AND actor.email=? AND actor.access_sub=? "+
+  "AND actor.status='active' AND tenant.status='active' AND actor.role IN ('owner','admin') "+
+  "AND (actor.role='owner' OR (? NOT IN ('owner','admin') AND "+
+  "NOT EXISTS(SELECT 1 FROM atlas_memberships recipient "+
+  "WHERE recipient.tenant_id=? AND recipient.email=? AND recipient.role IN ('owner','admin')))))";
+const memberChangeArgs=(tenantId,identity,target,role)=>[
+  tenantId,identity.email,identity.sub,role,tenantId,target
+];
+
 function storeRevision(db,tenantId,workspaceId,revision,email,at,auditId) {
   return db.prepare(
     'INSERT INTO atlas_workspace_revisions(tenant_id,workspace_id,revision,state_json,actor_email,created_at) '+
@@ -315,14 +328,35 @@ export function createHandler({verify = verifyAccessToken} = {}) {
         if ((['owner','admin'].includes(data.role) || ['owner','admin'].includes(prior?.role)) &&
             !can(member.role,'privileged-members'))
           throw new ApiError('Solo owner puede administrar roles privilegiados',403);
-        const now=new Date().toISOString();
-        await db.batch([
+        const now=new Date().toISOString(),auditId=crypto.randomUUID();
+        const guardArgs=memberChangeArgs(tenantId,identity,email,data.role);
+        const results=await db.batch([
           db.prepare(
-            "INSERT INTO atlas_memberships(tenant_id,email,access_sub,role,status,created_at,updated_at) VALUES(?,?,NULL,?,?,?,?) ON CONFLICT(tenant_id,email) DO UPDATE SET role=excluded.role,status=excluded.status,updated_at=excluded.updated_at"
-          ).bind(tenantId,email,data.role,data.status,now,now),
-          db.prepare('INSERT INTO atlas_audit_events(id,tenant_id,workspace_id,actor_email,action,metadata_json,occurred_at) VALUES(?,?,NULL,?,?,?,?)')
-            .bind(crypto.randomUUID(),tenantId,identity.email,'membership.changed',JSON.stringify({target:email,role:data.role,status:data.status}),now)
+            "INSERT INTO atlas_memberships(tenant_id,email,access_sub,role,status,created_at,updated_at) "+
+            "SELECT ?,?,NULL,?,?,?,? WHERE "+memberChangeGuard+" "+
+            "ON CONFLICT(tenant_id,email) DO UPDATE SET role=excluded.role,status=excluded.status,updated_at=excluded.updated_at "+
+            "WHERE "+memberChangeGuard
+          ).bind(tenantId,email,data.role,data.status,now,now,...guardArgs,...guardArgs),
+          db.prepare(
+            "INSERT INTO atlas_audit_events(id,tenant_id,workspace_id,actor_email,action,metadata_json,occurred_at) "+
+            "SELECT ?,?,NULL,?,?,?,? WHERE "+memberChangeGuard+" "+
+            "AND EXISTS(SELECT 1 FROM atlas_memberships target "+
+            "WHERE target.tenant_id=? AND target.email=? AND target.role=? AND target.status=? AND target.updated_at=?)"
+          ).bind(auditId,tenantId,identity.email,'membership.changed',
+            JSON.stringify({target:email,role:data.role,status:data.status}),now,
+            ...guardArgs,tenantId,email,data.role,data.status,now)
         ]);
+        if(results[0]?.meta?.changes!==1){
+          await requireStillAllowed(db,tenantId,identity,'members');
+          const latest=await db.prepare('SELECT role FROM atlas_memberships WHERE tenant_id=? AND email=?')
+            .bind(tenantId,email).first();
+          if(!can(member.role,'privileged-members') &&
+              (['owner','admin'].includes(data.role)||['owner','admin'].includes(latest?.role)))
+            throw new ApiError('Solo owner puede administrar roles privilegiados',403);
+          throw new ApiError('Permisos de administración modificados durante la operación',403);
+        }
+        if(results[1]?.meta?.changes!==1)
+          throw new ApiError('No se pudo verificar la auditoría de membresía',500);
         return reply({email,role:data.role,status:data.status});
       }
       throw new ApiError('Ruta o método inexistente',404);
