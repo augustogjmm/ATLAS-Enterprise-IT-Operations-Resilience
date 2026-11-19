@@ -331,22 +331,26 @@ export function createHandler({verify = verifyAccessToken} = {}) {
         const now=new Date().toISOString(),auditId=crypto.randomUUID();
         const guardArgs=memberChangeArgs(tenantId,identity,email,data.role);
         const results=await db.batch([
+          // Capturar el estado ANTERIOR dentro de la misma transacción y no desde
+          // el pre-chequeo (que podría haber quedado desactualizado).
+          db.prepare(
+            "INSERT INTO atlas_audit_events(id,tenant_id,workspace_id,actor_email,action,metadata_json,occurred_at) "+
+            "SELECT ?,?,NULL,?,'membership.changed',"+
+            "json_object('target',?,'previousRole',"+
+            "(SELECT role FROM atlas_memberships WHERE tenant_id=? AND email=?),"+
+            "'previousStatus',"+
+            "(SELECT status FROM atlas_memberships WHERE tenant_id=? AND email=?),"+
+            "'role',?,'status',?),? WHERE "+memberChangeGuard
+          ).bind(auditId,tenantId,identity.email,email,tenantId,email,
+            tenantId,email,data.role,data.status,now,...guardArgs),
           db.prepare(
             "INSERT INTO atlas_memberships(tenant_id,email,access_sub,role,status,created_at,updated_at) "+
             "SELECT ?,?,NULL,?,?,?,? WHERE "+memberChangeGuard+" "+
             "ON CONFLICT(tenant_id,email) DO UPDATE SET role=excluded.role,status=excluded.status,updated_at=excluded.updated_at "+
             "WHERE "+memberChangeGuard
-          ).bind(tenantId,email,data.role,data.status,now,now,...guardArgs,...guardArgs),
-          db.prepare(
-            "INSERT INTO atlas_audit_events(id,tenant_id,workspace_id,actor_email,action,metadata_json,occurred_at) "+
-            "SELECT ?,?,NULL,?,?,?,? WHERE "+memberChangeGuard+" "+
-            "AND EXISTS(SELECT 1 FROM atlas_memberships target "+
-            "WHERE target.tenant_id=? AND target.email=? AND target.role=? AND target.status=? AND target.updated_at=?)"
-          ).bind(auditId,tenantId,identity.email,'membership.changed',
-            JSON.stringify({target:email,role:data.role,status:data.status}),now,
-            ...guardArgs,tenantId,email,data.role,data.status,now)
+          ).bind(tenantId,email,data.role,data.status,now,now,...guardArgs,...guardArgs)
         ]);
-        if(results[0]?.meta?.changes!==1){
+        if(results[1]?.meta?.changes!==1){
           await requireStillAllowed(db,tenantId,identity,'members');
           const latest=await db.prepare('SELECT role FROM atlas_memberships WHERE tenant_id=? AND email=?')
             .bind(tenantId,email).first();
@@ -355,7 +359,7 @@ export function createHandler({verify = verifyAccessToken} = {}) {
             throw new ApiError('Solo owner puede administrar roles privilegiados',403);
           throw new ApiError('Permisos de administración modificados durante la operación',403);
         }
-        if(results[1]?.meta?.changes!==1)
+        if(results[0]?.meta?.changes!==1)
           throw new ApiError('No se pudo verificar la auditoría de membresía',500);
         return reply({email,role:data.role,status:data.status});
       }
