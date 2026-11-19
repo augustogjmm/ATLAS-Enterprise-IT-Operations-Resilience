@@ -6,6 +6,8 @@ import {validateGovernanceWorkflow,GovernanceRuleError} from './governance-rules
 
 // API V5 aislada del frontend V4. No se publica ni conecta sin Access y D1.
 const MAX_WORKSPACES_PER_TENANT = 10; // Límite deliberado de la demo en plan gratuito.
+const MAX_WORKSPACES_TOTAL = 20; // Evita sumar organizaciones hasta agotar D1 Free.
+const MAX_MEMBERS_PER_TENANT = 10; // Piloto pequeño; Access Free se mide por cuenta.
 const ROLES = Object.freeze({
   owner: ['read','write','members','privileged-members','audit','restore'],
   admin: ['read','write','members','audit','restore'],
@@ -144,6 +146,16 @@ const memberChangeGuard =
 const memberChangeArgs=(tenantId,identity,target,role)=>[
   tenantId,identity.email,identity.sub,role,tenantId,target
 ];
+// Un miembro ya activo puede actualizar su rol; un miembro nuevo o revocado
+// solo puede activarse cuando queda espacio. El guard corre en la transacción.
+const memberCapacityGuard =
+  "(? <> 'active' OR EXISTS(SELECT 1 FROM atlas_memberships current "+
+  "WHERE current.tenant_id=? AND current.email=? AND current.status='active') "+
+  "OR (SELECT COUNT(*) FROM atlas_memberships m "+
+  "WHERE m.tenant_id=? AND m.status='active') < ?)";
+const memberCapacityArgs=(tenantId,target,status)=>[
+  status,tenantId,target,tenantId,MAX_MEMBERS_PER_TENANT
+];
 
 function storeRevision(db,tenantId,workspaceId,revision,email,at,auditId) {
   return db.prepare(
@@ -216,9 +228,9 @@ export function createHandler({verify = verifyAccessToken} = {}) {
           db.prepare(
             'INSERT INTO atlas_workspaces(id,tenant_id,name,revision,state_json,created_by,updated_by,created_at,updated_at) '+
             'SELECT ?,?,?,?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM atlas_workspaces WHERE tenant_id=?) < ? '+
-            'AND '+liveMembershipSql('write')
+            'AND (SELECT COUNT(*) FROM atlas_workspaces) < ? AND '+liveMembershipSql('write')
           ).bind(id,tenantId,name,1,JSON.stringify(state),identity.email,identity.email,now,now,
-            tenantId,MAX_WORKSPACES_PER_TENANT,...liveMembershipArgs(tenantId,identity)),
+            tenantId,MAX_WORKSPACES_PER_TENANT,MAX_WORKSPACES_TOTAL,...liveMembershipArgs(tenantId,identity)),
           db.prepare(
             'INSERT INTO atlas_audit_events(id,tenant_id,workspace_id,actor_email,action,previous_revision,new_revision,metadata_json,occurred_at) '+
             'SELECT ?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM atlas_workspaces WHERE id=? AND tenant_id=?)'
@@ -227,6 +239,9 @@ export function createHandler({verify = verifyAccessToken} = {}) {
         ]);
         if (created[0]?.meta?.changes !== 1){
           await requireStillAllowed(db,tenantId,identity,'write');
+          const total=await db.prepare('SELECT COUNT(*) AS total FROM atlas_workspaces').first();
+          if(total?.total>=MAX_WORKSPACES_TOTAL)
+            throw new ApiError('Se alcanzó el límite global de '+MAX_WORKSPACES_TOTAL+' workspaces de la demo gratuita',429);
           throw new ApiError('Se alcanzó el límite de '+MAX_WORKSPACES_PER_TENANT+' workspaces por organización',429);
         }
         return reply({id,name,revision:1},201);
@@ -355,6 +370,7 @@ export function createHandler({verify = verifyAccessToken} = {}) {
           throw new ApiError('Solo owner puede administrar roles privilegiados',403);
         const now=new Date().toISOString(),auditId=crypto.randomUUID();
         const guardArgs=memberChangeArgs(tenantId,identity,email,data.role);
+        const capacityArgs=memberCapacityArgs(tenantId,email,data.status);
         const results=await db.batch([
           // Capturar el estado ANTERIOR dentro de la misma transacción y no desde
           // el pre-chequeo (que podría haber quedado desactualizado).
@@ -365,23 +381,30 @@ export function createHandler({verify = verifyAccessToken} = {}) {
             "(SELECT role FROM atlas_memberships WHERE tenant_id=? AND email=?),"+
             "'previousStatus',"+
             "(SELECT status FROM atlas_memberships WHERE tenant_id=? AND email=?),"+
-            "'role',?,'status',?),? WHERE "+memberChangeGuard
+            "'role',?,'status',?),? WHERE "+memberChangeGuard+" AND "+memberCapacityGuard
           ).bind(auditId,tenantId,identity.email,email,tenantId,email,
-            tenantId,email,data.role,data.status,now,...guardArgs),
+            tenantId,email,data.role,data.status,now,...guardArgs,...capacityArgs),
           db.prepare(
             "INSERT INTO atlas_memberships(tenant_id,email,access_sub,role,status,created_at,updated_at) "+
-            "SELECT ?,?,NULL,?,?,?,? WHERE "+memberChangeGuard+" "+
+            "SELECT ?,?,NULL,?,?,?,? WHERE "+memberChangeGuard+" AND "+memberCapacityGuard+" "+
             "ON CONFLICT(tenant_id,email) DO UPDATE SET role=excluded.role,status=excluded.status,updated_at=excluded.updated_at "+
-            "WHERE "+memberChangeGuard
-          ).bind(tenantId,email,data.role,data.status,now,now,...guardArgs,...guardArgs)
+            "WHERE "+memberChangeGuard+" AND "+memberCapacityGuard
+          ).bind(tenantId,email,data.role,data.status,now,now,...guardArgs,...capacityArgs,...guardArgs,...capacityArgs)
         ]);
         if(results[1]?.meta?.changes!==1){
           await requireStillAllowed(db,tenantId,identity,'members');
-          const latest=await db.prepare('SELECT role FROM atlas_memberships WHERE tenant_id=? AND email=?')
+          const latest=await db.prepare('SELECT role,status FROM atlas_memberships WHERE tenant_id=? AND email=?')
             .bind(tenantId,email).first();
           if(!can(member.role,'privileged-members') &&
               (['owner','admin'].includes(data.role)||['owner','admin'].includes(latest?.role)))
             throw new ApiError('Solo owner puede administrar roles privilegiados',403);
+          if(data.status==='active'&&latest?.status!=='active'){
+            const usage=await db.prepare(
+              "SELECT COUNT(*) AS active_count FROM atlas_memberships WHERE tenant_id=? AND status='active'"
+            ).bind(tenantId).first();
+            if(usage?.active_count>=MAX_MEMBERS_PER_TENANT)
+              throw new ApiError('Se alcanzó el límite de '+MAX_MEMBERS_PER_TENANT+' usuarios activos por organización gratuita',429);
+          }
           throw new ApiError('Permisos de administración modificados durante la operación',403);
         }
         if(results[0]?.meta?.changes!==1)

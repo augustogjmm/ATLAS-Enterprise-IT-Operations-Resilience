@@ -27,8 +27,9 @@ Las cuotas son de la **cuenta completa**, no de ATLAS. Las limitaciones y precio
 
 1. `scripts/v5-zero-cost-gate.mjs` inspecciona la plantilla V5: solo se admiten un Worker nuevo llamado `atlas-enterprise-v5`, Static Assets con acceso a Worker solo en `/api/*`, una D1 independiente `atlas-v5` y variables Access. Cualquier binding o parámetro adicional hace fallar la CI.
 2. `tests/v5-zero-cost-gate.test.js` comprueba que se rechazan recursos potencialmente cobrables (R2, KV, Queues, AI, Durable Objects, CPU del plan pago y bases/Workers ajenos).
-3. El preflight de seguridad prohíbe credenciales, archivos de configuración de despliegue raíz y publicación automática.
-4. La preview automática de Cloudflare para la rama V5 sigue desactivada. Ninguno de estos controles crea servicios.
+3. La API limita la demo a **10 workspaces por organización, 20 workspaces globales y 10 miembros activos por organización**. Los topes se comprueban dentro de la transacción SQL y devuelven HTTP 429 sin crear auditoría falsa. Con el límite de 1 MiB por solicitud y cinco revisiones retenidas por workspace, se acota el tamaño de los snapshots; no se garantiza que el total de auditorías no pueda crecer.
+4. El preflight de seguridad prohíbe credenciales, archivos de configuración de despliegue raíz y publicación automática.
+5. La preview automática de Cloudflare para la rama V5 sigue desactivada. Ninguno de estos controles crea servicios.
 
 **Límite del gate:** inspecciona una **plantilla**, no el estado de facturación. No puede demostrar por sí solo que un futuro despliegue costará USD 0. Si alguien sustituye la plantilla o configura servicios manualmente en Cloudflare, la CI no detectará automáticamente esa mutación externa. Se requiere verificación externa previa a activar cualquier recurso.
 

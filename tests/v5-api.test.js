@@ -500,3 +500,56 @@ test('identidad: cambio de admin a viewer entre consultas usa rol vigente',async
     'SELECT access_sub FROM atlas_memberships WHERE tenant_id=? AND email=?'
   ).get('org-a','admin@a.test').access_sub,'access-admin@a.test');
 });
+
+test('costo cero: 20 workspaces globales impiden expansión de D1 sin auditoría falsa',async()=>{
+  const {call,sqlite}=fixture();
+  const stamp='2026-11-19T00:00:00Z';
+  const insert=sqlite.prepare(
+    'INSERT INTO atlas_workspaces(id,tenant_id,name,revision,state_json,created_by,updated_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)'
+  );
+  for(let n=0;n<20;n++){
+    const tenant=n<10?'org-a':'org-b';
+    insert.run('seed-'+n,tenant,'Sintético '+n,1,'{}','owner@a.test','owner@a.test',stamp,stamp);
+  }
+  sqlite.prepare('INSERT INTO atlas_tenants(id,name,created_at) VALUES(?,?,?)')
+    .run('org-c','Organización de prueba C',stamp);
+  sqlite.prepare(
+    "INSERT INTO atlas_memberships(tenant_id,email,role,status,created_at,updated_at) VALUES(?,?,?,'active',?,?)"
+  ).run('org-c','owner@c.test','owner',stamp,stamp);
+  const request=await call('owner@c.test','POST','/api/v1/tenants/org-c/workspaces',
+    {name:'Debe bloquearse',state:makeEmpty()});
+  assert.equal(request.status,429,JSON.stringify(request.body));
+  assert.match(request.body.error,/límite global de 20 workspaces/);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM atlas_workspaces').get().n,20);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM atlas_audit_events').get().n,0);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM atlas_workspace_revisions').get().n,0);
+});
+
+test('costo cero: máximo 10 miembros activos; revocación permite nueva invitación',async()=>{
+  const {call,sqlite}=fixture();
+  const base='/api/v1/tenants/org-a/members/';
+  // El fixture incluye cinco miembros activos. Agregar cinco hasta completar 10.
+  for(let n=0;n<5;n++){
+    const done=await call('owner@a.test','PUT',base+'demo-'+n+'@a.test',
+      {role:'viewer',status:'active'});
+    assert.equal(done.status,200,JSON.stringify(done.body));
+  }
+  const before=sqlite.prepare('SELECT COUNT(*) AS n FROM atlas_audit_events').get().n;
+  const refused=await call('owner@a.test','PUT',base+'extra@a.test',
+    {role:'viewer',status:'active'});
+  assert.equal(refused.status,429,JSON.stringify(refused.body));
+  assert.match(refused.body.error,/límite de 10 usuarios activos/);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM atlas_audit_events').get().n,before);
+  assert.equal(sqlite.prepare(
+    "SELECT COUNT(*) AS n FROM atlas_memberships WHERE tenant_id=? AND status='active'"
+  ).get('org-a').n,10);
+  assert.equal((await call('owner@a.test','PUT',base+'demo-0@a.test',
+    {role:'editor',status:'active'})).status,200,'Actualizar existente no consume una plaza');
+  assert.equal((await call('owner@a.test','PUT',base+'demo-0@a.test',
+    {role:'editor',status:'revoked'})).status,200);
+  assert.equal((await call('owner@a.test','PUT',base+'extra@a.test',
+    {role:'viewer',status:'active'})).status,200,'La baja libera capacidad');
+  const refusedAgain=await call('owner@a.test','PUT',base+'demo-0@a.test',
+    {role:'editor',status:'active'});
+  assert.equal(refusedAgain.status,429,'Una reactivación también respeta la cuota');
+});
