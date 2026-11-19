@@ -58,7 +58,7 @@ La última prueba utiliza el **Worker real importado**, migraciones SQL aplicada
 2. Verificar con documentación actual los límites de Workers, Static Assets, D1 y Access, incluidos posibles requisitos de facturación de Zero Trust. No asumir costo cero sin esa confirmación.
 3. Preparar **nuevo** Worker V5 y **nueva** D1 aislada; impedir que ramas/PR públicos permitan despliegues automáticos o exposición de credenciales.
 4. Configurar Access antes de exponer una URL; validar JWT RS256, issuer, audience y política `deny by default`. Nunca usar `X-Local-Test-Identity` (solo existe en tests).
-5. Aplicar en orden `migrations/0001_atlas_v5.sql` y `migrations/0002_atlas_v5_history.sql` a la nueva D1. No ejecutar contra bases ajenas. Habilitar `PRAGMA foreign_keys=ON` y verificar restricciones en el entorno efectivo.
+5. Aplicar en orden `migrations/0001_atlas_v5.sql` y `migrations/0002_atlas_v5_history.sql` a la nueva D1. No ejecutar contra bases ajenas. Cloudflare D1 **aplica claves foráneas automáticamente y prohíbe** `PRAGMA foreign_keys=ON`; verificar su integridad con consultas de solo lectura. En SQLite local sí debe habilitarse `PRAGMA foreign_keys=ON` antes de aplicar migraciones.
 6. Registrar una única organización sintética y un `owner` preaprobado. La API **no** ofrece alta pública de organizaciones. Probar inicio de sesión, permisos, auditoría, revocación y restauración.
 7. Probar la misma revisión desde dos navegadores físicos o cuentas separadas; observar HTTP 409, descarga de respaldo y ausencia de sobrescrituras.
 
