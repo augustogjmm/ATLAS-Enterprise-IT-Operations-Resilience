@@ -100,6 +100,7 @@ Abrir **http://localhost:8080/**. El simulador de resiliencia anterior continúa
 | --- | --- |
 | [Guía de demostración](docs/DEMO_GUIDE.md) | Recorrido corto para una entrevista o revisión ejecutiva. |
 | [Caso de producto y liderazgo](docs/CASE_STUDY.md) | Decisiones de arquitectura, gobierno, evidencia y evolución del producto. |
+| [Estado verificable del proyecto](docs/PROJECT_STATUS.md) | Qué está implementado, probado, publicado y pendiente. |
 | [Arquitectura y decisiones](docs/ARCHITECTURE.md) | Separación de componentes y límites técnicos. |
 | [Gobierno funcional](docs/GOBIERNO_FUNCIONAL_V1.md) | Reglas que convierten hallazgos en riesgos y acciones. |
 | [Metodología KPI/OKR](docs/KPI_OKR_METODOLOGIA.md) | Definiciones, alcances y fórmulas. |
