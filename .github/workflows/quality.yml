@@ -76,4 +76,31 @@ jobs:
           path: test-artifacts/
           if-no-files-found: ignore
           retention-days: 7
-      # Sin credenciales, APIs productivas ni despliegue. Instalación de Playwright solo en CI.
+      - name: Generar paquete de publicación ATLAS V5 (frontend)
+        if: success()
+        run: |
+          test -f dist/index.html
+          test -f dist/atlas-v4-system.css
+          test -f dist/executive-command.js
+          test -f dist/atlas-shell.js
+          node --input-type=module -e "
+            import {readFileSync,writeFileSync} from 'node:fs';
+            import {createHash} from 'node:crypto';
+            const files=['index.html','atlas-v4-system.css','executive-command.js','atlas-shell.js'];
+            const digests=Object.fromEntries(files.map(f=>[f,createHash('sha256').update(readFileSync('dist/'+f)).digest('hex')]));
+            writeFileSync('dist/atlas-v5-release.json',JSON.stringify({
+              product:'ATLAS V5',mode:'frontend-local',commit:process.env.GITHUB_SHA,
+              backend:'No disponible sin Cloudflare Access y D1',
+              files:digests
+            },null,2));
+          "
+      - name: Publicar ZIP descargable de frontend validado
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-v5-frontend-validado
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
+      # Paquete sólo frontend; este workflow NO despliega ni crea recursos de Cloudflare.
+
