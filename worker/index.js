@@ -46,7 +46,8 @@ function normalizeState(input) {
     validatePerformanceState(state);
     validateIncidentState(state);
     validateGovernanceWorkflow(state);
-  } catch (error) { throw new ApiError('Respaldo V4 inválido: ' + error.message,422); }
+  } catch (error) { throw new ApiError('Respaldo V4 inválido: ' + error.message,
+    error instanceof GovernanceRuleError ? 422 : 400); }
   return state;
 }
 async function readBody(request) {
