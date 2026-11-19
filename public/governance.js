@@ -12,6 +12,7 @@ import {inspectIncidentCSV,suggestColumnMapping,suggestServiceMap,suggestPriorit
 import {importWizardView} from './import-wizard-ui.js';
 import {mountRemoteV5} from './v5-ui.js';
 import {renderExecutiveCommand,handleExecutiveCommand} from './executive-command.js';
+import {mountAtlasShell} from './atlas-shell.js';
 
 const STORAGE_KEY='atlas-governance-workspace-v1';
 const today=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')};
@@ -358,6 +359,7 @@ function render(){
  for(const node of document.querySelectorAll('[data-view]'))node.classList.toggle('selected',node.dataset.view===view);
  if(view==='incidents'&&importDraft)drawImportWizard();
  v5.render();
+ atlasShell?.update();
 }
 
 function drawImportWizard(){
@@ -580,5 +582,6 @@ window.addEventListener('storage',e=>{
  if(e.key!==STORAGE_KEY||v5.active())return;
  try{state=e.newValue?upgrade(JSON.parse(e.newValue)):seedDemoIncidents(seedDemoPerformance(createDemo()));render();notice('Los registros fueron actualizados desde otra pestaña.')}catch{notice('No se pudo sincronizar esta pestaña.',true)}
 });
+const atlasShell=mountAtlasShell({getState:()=>state,getWorkspace:()=>v5.state(),navigate:switchView});
 render();
 if(!storageOK)notice('El almacenamiento local no está disponible: los cambios no persistirán.',true);
